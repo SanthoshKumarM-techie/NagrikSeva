@@ -52,14 +52,20 @@ export const buildWorkerAssignmentParams = ({ worker, complaint, officer, notes 
  *
  * Body matches CivicLens requirement:
  * Hello {{citizen_name}},
- * Your complaint has received a new progress update.
+ *
+ * Your CivicLens complaint has received a new update.
+ *
  * Complaint ID: {{complaint_id}}
- * Category: {{category}}
  * Department: {{department_name}}
  * Current Status: {{status}}
  * Last Updated: {{updated_at}}
- * To view the latest progress, open your CivicLens live complaint tracker:
+ *
+ * View your live complaint progress here:
+ *
  * {{tracker_url}}
+ *
+ * Regards,
+ * CivicLens Team
  *
  * @param {object} data
  * @param {object} data.complaint - Complaint object

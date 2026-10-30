@@ -34,20 +34,23 @@ VITE_EMAILJS_SERVICE_ID=service_abc1234
 ```
 Hello {{worker_name}},
 
-A new complaint has been assigned to you for field resolution.
+A new complaint has been assigned to you through CivicLens.
 
 Complaint ID: {{complaint_id}}
 Department: {{department_name}}
 Category: {{category}}
-Description: {{description}}
-Location: {{location}}
 Priority: {{priority}}
-Assigned by: {{assigned_officer}}
-Date Assigned: {{assignment_date}}
-Notes: {{assignment_notes}}
+Location: {{location}}
 
-Log in to the CivicLens portal to view and manage this complaint:
-{{worker_dashboard_url}}
+Complaint Description:
+{{description}}
+
+Assigned Officer: {{assigned_officer}}
+Assignment Date: {{assignment_date}}
+
+Please log in to your CivicLens Worker Dashboard and review your assigned complaint.
+
+Worker Dashboard: {{worker_dashboard_url}}
 
 Regards,
 CivicLens Team
@@ -71,20 +74,16 @@ VITE_EMAILJS_TEMPLATE_WORKER_ASSIGNED=template_wrk9876
 ```
 Hello {{citizen_name}},
 
-Your complaint has received a new progress update.
+Your CivicLens complaint has received a new update.
 
-Complaint ID:    {{complaint_id}}
-Category:        {{category}}
-Department:      {{department_name}}
-Current Status:  {{status}}
-Last Updated:    {{updated_at}}
+Complaint ID: {{complaint_id}}
+Department: {{department_name}}
+Current Status: {{status}}
+Last Updated: {{updated_at}}
 
-To view the latest progress, open your CivicLens live complaint tracker:
+View your live complaint progress here:
 
 {{tracker_url}}
-
-You can view the current complaint status, department updates and available
-progress information through your tracker.
 
 Regards,
 CivicLens Team
@@ -179,3 +178,4 @@ If `frontend/.env` is empty or incomplete, the system runs in **simulation mode*
 | Citizen gets another citizen's email | Impossible by design — email is fetched via `complaint.citizenId = users.id` JOIN |
 | Duplicate emails | 8-second deduplication window prevents rapid double-send |
 | Failed email reverted my assignment | Not possible — email failures are caught and logged separately |
+
