@@ -222,4 +222,78 @@ describe('CivicLens EmailJS Integration Workflow', () => {
       expect(failedLog.error_message).toBeTruthy();
     });
   });
+
+  // ─── Requirement #8: Multi-citizen dynamic recipient verification ────────────
+  describe('Multi-Citizen Dynamic Recipient Tests (Req #8)', () => {
+    const citizens = [
+      { id: 'cit-001', citizenEmail: 'aarav.sharma@example.com',  citizenName: 'Aarav Sharma',       ticketNumber: 'BLR-2026-0001', status: 'Work in Progress' },
+      { id: 'cit-002', citizenEmail: 'meera.k@example.com',       citizenName: 'Meera Krishnan',     ticketNumber: 'BLR-2026-0002', status: 'Complaint Resolved' },
+      { id: 'cit-003', citizenEmail: 'vikram.roy@example.com',    citizenName: 'Vikramaditya Roy',   ticketNumber: 'BLR-2026-0003', status: 'Work Submitted for Review' },
+    ];
+
+    it('should route each citizen email to their own registered address — no cross-contamination', () => {
+      const emails = new Set();
+      for (const citizen of citizens) {
+        const params = buildCitizenTrackerParams({ complaint: citizen });
+        expect(params.to_email).toBe(citizen.citizenEmail);
+        expect(params.citizen_name).toBe(citizen.citizenName);
+        expect(params.tracker_url).toContain(citizen.id);
+        emails.add(params.to_email);
+      }
+      // All 3 citizens produced unique recipient addresses
+      expect(emails.size).toBe(3);
+    });
+
+    it('should produce empty to_email — NOT a hardcoded address — when citizenEmail is missing', () => {
+      const noEmailCitizen = { id: 'cit-004', citizenEmail: '', citizenName: 'Ghost Citizen', ticketNumber: 'BLR-2026-0004', status: 'Pending' };
+      const params = buildCitizenTrackerParams({ complaint: noEmailCitizen });
+      // Must be falsy — never fall back to 'citizen@example.com' or any hardcoded value
+      expect(params.to_email).toBeFalsy();
+      expect(params.to_email).not.toBe('citizen@example.com');
+    });
+
+    it('should produce falsy to_email — NOT worker@bbmp.gov.in — when worker.email is missing', () => {
+      const noEmailWorker = { id: 'WRK-404', name: 'Ghost Worker' }; // intentionally no email
+      const params = buildWorkerAssignmentParams({
+        worker: noEmailWorker,
+        complaint: { id: 'comp-404', ticketNumber: 'BLR-2026-0404' }
+      });
+      // Must be falsy (undefined) — never fall back to 'worker@bbmp.gov.in'
+      expect(params.to_email).toBeFalsy();
+      expect(params.to_email).not.toBe('worker@bbmp.gov.in');
+    });
+
+    it('validateCitizenEmail should reject empty and undefined citizen emails', () => {
+      expect(validateCitizenEmail({ citizenEmail: '' }).valid).toBe(false);
+      expect(validateCitizenEmail({ citizenEmail: undefined }).valid).toBe(false);
+      expect(validateCitizenEmail('').valid).toBe(false);
+      // Valid address from registered citizen should pass
+      expect(validateCitizenEmail('aarav.sharma@example.com').valid).toBe(true);
+    });
+  });
+
+  // ─── Citizen privacy: internal data must not reach citizen email ─────────────
+  describe('Citizen Data Privacy (Req #6)', () => {
+    it('should not include internal officer/worker data in citizen tracker params', () => {
+      const complaint = {
+        id: 'comp-300',
+        ticketNumber: 'BLR-2026-0300',
+        citizenEmail: 'priya.r@example.com',
+        citizenName: 'Priya Ramachandran',
+        status: 'Work in Progress',
+        category: 'Water Supply',
+        department: 'Water Supply Department',
+        internalNotes: 'Sensitive internal remark',
+        workerPhone: '+91-9876543210',
+        supervisorNotes: 'Escalation required'
+      };
+      const params = buildCitizenTrackerParams({ complaint });
+
+      expect(params).not.toHaveProperty('internalNotes');
+      expect(params).not.toHaveProperty('workerPhone');
+      expect(params).not.toHaveProperty('supervisorNotes');
+      expect(params.to_email).toBe('priya.r@example.com');
+      expect(params.status).toBe('Work in Progress'); // public status IS present
+    });
+  });
 });

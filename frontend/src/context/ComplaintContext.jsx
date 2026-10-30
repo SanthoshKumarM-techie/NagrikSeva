@@ -287,6 +287,9 @@ export const ComplaintProvider = ({ children }) => {
   useEffect(() => { setStorage(STORAGE_KEYS.USERS, users); }, [users]);
 
   // Email recipient resolution helpers
+  // Returns the registered worker object; email field comes from the live users/workers state.
+  // If the worker cannot be located in any list the stub has NO email so the validation
+  // layer in emailService.js will reject the send — never falls back to a hardcoded address.
   const resolveWorker = useCallback((workerId) => {
     return (
       workers.find(w => w.id === workerId) ||
@@ -294,11 +297,15 @@ export const ComplaintProvider = ({ children }) => {
       INITIAL_WORKERS.find(w => w.id === workerId) || {
         id: workerId,
         name: 'Field Specialist',
-        email: 'worker@bbmp.gov.in'
+        email: '' // No email found — emailService validation will reject gracefully
       }
     );
   }, [workers, users]);
 
+  // Returns the registered citizen's email, resolved from the complaint's backend join,
+  // the live users state, or the currently authenticated user.
+  // Returns empty string if unresolvable — emailService validation will reject gracefully.
+  // NEVER falls back to a hardcoded example address.
   const resolveCitizenEmail = useCallback((complaint) => {
     if (!complaint) return '';
     return (
@@ -307,7 +314,7 @@ export const ComplaintProvider = ({ children }) => {
       users.find(u => u.id === complaint.citizenId)?.email ||
       INITIAL_USERS.find(u => u.id === complaint.citizenId)?.email ||
       (complaint.citizenId === currentUser?.id ? currentUser?.email : null) ||
-      'citizen@example.com'
+      '' // No registered email found — do not send to unknown address
     );
   }, [users, currentUser]);
 

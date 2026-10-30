@@ -139,6 +139,63 @@ async function runTests() {
   assert(missingEmailResult.success === false, 'Missing worker email handled safely without throwing');
   assert(missingEmailResult.log?.delivery_attempt_status === 'FAILED', 'Missing email logged with status FAILED');
 
+  // 4. Multi-citizen dynamic recipient tests (Req #8)
+  console.log('\n4. Testing Multi-Citizen Dynamic Recipient Delivery (Req #8):');
+  const citizens = [
+    { id: 'cit-001', citizenEmail: 'aarav.sharma@example.com',    citizenName: 'Aarav Sharma',       ticketNumber: 'BLR-2026-0001', status: 'Work in Progress' },
+    { id: 'cit-002', citizenEmail: 'meera.k@example.com',         citizenName: 'Meera Krishnan',     ticketNumber: 'BLR-2026-0002', status: 'Complaint Resolved' },
+    { id: 'cit-003', citizenEmail: 'vikram.roy@example.com',      citizenName: 'Vikramaditya Roy',   ticketNumber: 'BLR-2026-0003', status: 'Work Submitted for Review' },
+  ];
+
+  const emails = new Set();
+  for (const citizen of citizens) {
+    const params = buildCitizenTrackerParams({ complaint: citizen });
+    assert(params.to_email === citizen.citizenEmail, `Citizen "${citizen.citizenName}" gets their own email (${citizen.citizenEmail})`);
+    assert(params.citizen_name === citizen.citizenName, `Citizen name correct for ${citizen.citizenName}`);
+    assert(params.tracker_url.includes(citizen.id), `Tracker URL specific to complaint ${citizen.ticketNumber}`);
+    emails.add(params.to_email);
+  }
+  assert(emails.size === 3, 'All three citizens receive distinct emails — no cross-contamination');
+
+  // Verify empty-email citizen is rejected safely (never leaks to hardcoded address)
+  const noEmailCitizen = { id: 'cit-004', citizenEmail: '', citizenName: 'No Email User', ticketNumber: 'BLR-2026-0004', status: 'Pending' };
+  const noEmailResult = await sendCitizenTrackerEmail({ complaint: noEmailCitizen, eventType: 'COMPLAINT_RECEIVED' });
+  assert(noEmailResult.success === false, 'Missing citizen email results in safe failure (not sent to hardcoded address)');
+  assert(noEmailResult.log?.delivery_attempt_status === 'FAILED', 'Missing citizen email logged as FAILED');
+  assert(noEmailResult.log?.recipient_email !== 'citizen@example.com', 'No hardcoded fallback address used');
+
+  // Verify empty worker email is rejected safely
+  const noEmailWorker = { id: 'WRK-404', name: 'Ghost Worker' }; // no email field
+  const noEmailWorkerResult = await sendWorkerAssignmentEmail({
+    worker: noEmailWorker,
+    complaint: { id: 'comp-404', ticketNumber: 'BLR-2026-0404' }
+  });
+  assert(noEmailWorkerResult.success === false, 'Missing worker email results in safe failure');
+  assert(noEmailWorkerResult.log?.recipient_email !== 'worker@bbmp.gov.in', 'No hardcoded bbmp.gov.in fallback used');
+
+  // 5. Verify no internal fields leak to citizen template
+  console.log('\n5. Testing Citizen Privacy (No Internal Data Leakage):');
+  const complaintWithInternals = {
+    id: 'comp-200',
+    ticketNumber: 'BLR-2026-0200',
+    citizenEmail: 'priya.r@example.com',
+    citizenName: 'Priya Ramachandran',
+    status: 'Work in Progress',
+    category: 'Water Supply',
+    department: 'Water Supply Department',
+    internalNotes: 'Worker had equipment failure — escalate to supervisor',
+    workerPhone: '+91-9876543210',
+    workerPersonalEmail: 'worker.personal@gmail.com',
+    supervisorNotes: 'Sensitive internal remark'
+  };
+  const privacyParams = buildCitizenTrackerParams({ complaint: complaintWithInternals });
+  assert(!('internalNotes' in privacyParams), 'Internal notes NOT included in citizen email');
+  assert(!('workerPhone' in privacyParams), 'Worker phone NOT included in citizen email');
+  assert(!('workerPersonalEmail' in privacyParams), 'Worker personal email NOT included in citizen email');
+  assert(!('supervisorNotes' in privacyParams), 'Supervisor notes NOT included in citizen email');
+  assert(privacyParams.to_email === 'priya.r@example.com', 'Only registered citizen email used');
+  assert(privacyParams.status === 'Work in Progress', 'Public status IS included');
+
   console.log(`\nResults: ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exit(1);
 }
@@ -147,3 +204,4 @@ runTests().catch(err => {
   console.error('Fatal test error:', err);
   process.exit(1);
 });
+
