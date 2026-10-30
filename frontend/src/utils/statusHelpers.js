@@ -1,4 +1,4 @@
-import { COMPLAINT_STATUS, PRIORITIES } from './constants';
+import { COMPLAINT_STATUS, PRIORITIES } from './constants.js';
 
 export const STATUS_LOOKUP = {
   'SUBMITTED': COMPLAINT_STATUS.SUBMITTED,

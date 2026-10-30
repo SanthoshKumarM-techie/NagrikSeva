@@ -12,6 +12,9 @@ import { getImageUrl } from '../utils/imageHelpers';
 import { getStorage, setStorage } from '../utils/storage';
 import { useNotifications } from './NotificationContext';
 import { useAuth } from './AuthContext';
+import { sendWorkerAssignmentEmail, sendCitizenTrackerEmail } from '../services/email/emailService';
+import { INITIAL_WORKERS } from '../data/mockWorkers';
+import { INITIAL_USERS } from '../data/mockUsers';
 
 const ComplaintContext = createContext();
 
@@ -283,6 +286,31 @@ export const ComplaintProvider = ({ children }) => {
   useEffect(() => { setStorage(STORAGE_KEYS.SLAS, slas); }, [slas]);
   useEffect(() => { setStorage(STORAGE_KEYS.USERS, users); }, [users]);
 
+  // Email recipient resolution helpers
+  const resolveWorker = useCallback((workerId) => {
+    return (
+      workers.find(w => w.id === workerId) ||
+      users.find(u => u.id === workerId) ||
+      INITIAL_WORKERS.find(w => w.id === workerId) || {
+        id: workerId,
+        name: 'Field Specialist',
+        email: 'worker@bbmp.gov.in'
+      }
+    );
+  }, [workers, users]);
+
+  const resolveCitizenEmail = useCallback((complaint) => {
+    if (!complaint) return '';
+    return (
+      complaint.citizenEmail ||
+      complaint.citizen_email ||
+      users.find(u => u.id === complaint.citizenId)?.email ||
+      INITIAL_USERS.find(u => u.id === complaint.citizenId)?.email ||
+      (complaint.citizenId === currentUser?.id ? currentUser?.email : null) ||
+      'citizen@example.com'
+    );
+  }, [users, currentUser]);
+
   // Initial master data load from backend
   const fetchAllData = useCallback(async () => {
     try {
@@ -506,6 +534,14 @@ export const ComplaintProvider = ({ children }) => {
         type: 'new_complaint'
       });
 
+      // Send EmailJS Live Tracker notification to registered citizen
+      sendCitizenTrackerEmail({
+        complaint: mapped,
+        recipientEmail: currentUser?.email || mapped.citizenEmail,
+        recipientName: currentUser?.name || mapped.citizenName,
+        eventType: 'COMPLAINT_RECEIVED'
+      }).catch(err => console.warn('Citizen complaint received email dispatch notice:', err));
+
       return mapped;
     } catch (err) {
       console.error('Failed to create complaint:', err);
@@ -649,6 +685,20 @@ export const ComplaintProvider = ({ children }) => {
         return c;
       })
     );
+
+    const targetComp = complaints.find(c => c.id === complaintId || c.ticketNumber === complaintId || c.complaintId === complaintId);
+    if (targetComp) {
+      sendCitizenTrackerEmail({
+        complaint: {
+          ...targetComp,
+          department: targetDept?.name || targetComp.department,
+          status: COMPLAINT_STATUS.DEPARTMENT_REVIEW,
+          citizenEmail: resolveCitizenEmail(targetComp)
+        },
+        eventType: 'DEPARTMENT_ASSIGNED'
+      }).catch(err => console.warn('Citizen department assignment email notice:', err));
+    }
+
     return true;
   };
 
@@ -793,6 +843,37 @@ export const ComplaintProvider = ({ children }) => {
       return updated;
     });
 
+    // 1. Retrieve worker registered email & full details
+    const resolvedWorker = resolveWorker(workerId);
+    const targetComp = complaints.find(c =>
+      c.id === complaintId ||
+      c.complaintId === complaintId ||
+      c.assignmentId === complaintId ||
+      c.ticketNumber === complaintId ||
+      (fallbackId && (c.id === fallbackId || c.ticketNumber === fallbackId || c.complaintId === fallbackId || c.assignmentId === fallbackId))
+    );
+
+    // 2. Dispatch EmailJS Worker Assignment Email
+    sendWorkerAssignmentEmail({
+      worker: resolvedWorker,
+      complaint: targetComp || { id: complaintId, ticketNumber: complaintId },
+      officer: officerUser,
+      notes
+    }).catch(err => console.warn('Worker assignment email dispatch notice:', err));
+
+    // 3. Dispatch EmailJS Citizen Live Tracker Email for worker assignment progress update
+    if (targetComp) {
+      sendCitizenTrackerEmail({
+        complaint: {
+          ...targetComp,
+          status: COMPLAINT_STATUS.WORKER_ASSIGNED,
+          citizenEmail: resolveCitizenEmail(targetComp),
+          updatedAt: timestamp
+        },
+        eventType: 'WORKER_ASSIGNED'
+      }).catch(err => console.warn('Citizen worker assigned tracker email notice:', err));
+    }
+
     setTimeout(() => {
       fetchAllData().catch(() => {});
     }, 400);
@@ -934,6 +1015,22 @@ export const ComplaintProvider = ({ children }) => {
       return updated;
     });
 
+    if (targetComp) {
+      let eventType = 'PROGRESS_UPDATED';
+      if (newStatus === COMPLAINT_STATUS.WORK_IN_PROGRESS) eventType = 'WORK_STARTED';
+      else if (newStatus === COMPLAINT_STATUS.VERIFICATION) eventType = 'WORK_SUBMITTED_FOR_REVIEW';
+
+      sendCitizenTrackerEmail({
+        complaint: {
+          ...targetComp,
+          status: newStatus,
+          citizenEmail: resolveCitizenEmail(targetComp),
+          updatedAt: timestamp
+        },
+        eventType
+      }).catch(err => console.warn('Citizen status update email notice:', err));
+    }
+
     setTimeout(() => {
       fetchAllData().catch(() => {});
     }, 400);
@@ -987,6 +1084,25 @@ export const ComplaintProvider = ({ children }) => {
       setStorage(STORAGE_KEYS.COMPLAINTS, updated);
       return updated;
     });
+
+    const targetComp = complaints.find(c =>
+      c.id === complaintId ||
+      c.complaintId === complaintId ||
+      c.assignmentId === complaintId ||
+      c.ticketNumber === complaintId ||
+      (fallbackId && (c.id === fallbackId || c.ticketNumber === fallbackId || c.complaintId === fallbackId || c.assignmentId === fallbackId))
+    );
+    if (targetComp) {
+      sendCitizenTrackerEmail({
+        complaint: {
+          ...targetComp,
+          status: targetStatus,
+          citizenEmail: resolveCitizenEmail(targetComp),
+          updatedAt: timestamp
+        },
+        eventType: verified ? 'COMPLAINT_RESOLVED' : 'RESOLUTION_REJECTED'
+      }).catch(err => console.warn('Citizen verify resolution email notice:', err));
+    }
 
     setTimeout(() => {
       fetchAllData().catch(() => {});
@@ -1045,6 +1161,18 @@ export const ComplaintProvider = ({ children }) => {
       setStorage(STORAGE_KEYS.COMPLAINTS, updated);
       return updated;
     });
+
+    if (targetComp) {
+      sendCitizenTrackerEmail({
+        complaint: {
+          ...targetComp,
+          status: COMPLAINT_STATUS.CLOSED,
+          citizenEmail: resolveCitizenEmail(targetComp),
+          updatedAt: timestamp
+        },
+        eventType: 'COMPLAINT_CLOSED'
+      }).catch(err => console.warn('Citizen confirm closure email notice:', err));
+    }
 
     setTimeout(() => {
       fetchAllData().catch(() => {});
@@ -1105,6 +1233,18 @@ export const ComplaintProvider = ({ children }) => {
       setStorage(STORAGE_KEYS.COMPLAINTS, updated);
       return updated;
     });
+
+    if (targetComp) {
+      sendCitizenTrackerEmail({
+        complaint: {
+          ...targetComp,
+          status: COMPLAINT_STATUS.DISPUTED,
+          citizenEmail: resolveCitizenEmail(targetComp),
+          updatedAt: timestamp
+        },
+        eventType: 'COMPLAINT_REOPENED'
+      }).catch(err => console.warn('Citizen dispute reopen email notice:', err));
+    }
 
     setTimeout(() => {
       fetchAllData().catch(() => {});
