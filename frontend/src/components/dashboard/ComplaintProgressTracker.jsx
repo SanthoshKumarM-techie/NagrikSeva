@@ -92,7 +92,7 @@ export const ComplaintProgressTracker = ({ complaint, className = '' }) => {
       detail: inspectionEvent
         ? 'Physical inspection recorded'
         : (currentRank === 3 ? 'Inspection underway' : 'Pending site check'),
-      note: inspectionEvent?.description || (currentRank === 3 ? 'Field worker conducting site damage assessment' : 'Awaiting on-site inspection')
+      note: inspectionEvent?.description || (currentRank === 3 ? 'Contractor & crew conducting site damage assessment' : 'Awaiting on-site inspection')
     },
     {
       id: 'work_started',
@@ -153,7 +153,7 @@ export const ComplaintProgressTracker = ({ complaint, className = '' }) => {
         return {
           bg: 'bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-900 text-indigo-800 dark:text-indigo-300',
           title: 'Field Crew Allocated',
-          desc: `Field worker ${complaint.assignedWorkerName || 'assigned'} has received the job order and is preparing for site visit.`
+          desc: `Contractor & crew ${complaint.assignedWorkerName || 'assigned'} has received the job order and is preparing for site visit.`
         };
       case 3:
         return {

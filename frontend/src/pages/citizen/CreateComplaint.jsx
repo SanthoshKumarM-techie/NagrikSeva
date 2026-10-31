@@ -532,6 +532,8 @@ export const CreateComplaint = () => {
                 placeholder="Describe how long the issue has persisted, hazard level, impact on pedestrians or traffic..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                enableVoice={true}
+                onVoiceChange={(text) => setFormData((prev) => ({ ...prev, description: text }))}
                 required
               />
 

@@ -481,6 +481,8 @@ export const ComplaintDetails = () => {
             placeholder="Explain why the resolution is unsatisfactory (e.g. debris left behind, water still leaking, pothole patched improperly)..."
             value={disputeReason}
             onChange={(e) => setDisputeReason(e.target.value)}
+            enableVoice={true}
+            onVoiceChange={(text) => setDisputeReason(text)}
             required
           />
           <div className="flex items-center justify-between text-[11px]">

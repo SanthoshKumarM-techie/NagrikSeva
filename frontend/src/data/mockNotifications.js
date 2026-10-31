@@ -14,7 +14,7 @@ export const INITIAL_NOTIFICATIONS = [
     id: 'NOTIF-002',
     userId: 'CIT001',
     role: 'Citizen',
-    title: 'Field Worker Assigned',
+    title: 'Contractor & Crew Assigned',
     message: 'Worker Ramesh Nayak has been assigned to inspect and fix the pothole for complaint BLR-2025-0101.',
     complaintId: 'BLR-2025-0101',
     type: 'worker_assigned',
@@ -57,7 +57,7 @@ export const INITIAL_NOTIFICATIONS = [
   {
     id: 'NOTIF-006',
     userId: 'WRK001',
-    role: 'Field Worker',
+    role: 'Contractor & Crew Operations',
     title: 'New Task Assignment',
     message: 'You have been assigned to repair deep pothole cluster at Indiranagar 100 Feet Road (BLR-2025-0101).',
     complaintId: 'BLR-2025-0101',

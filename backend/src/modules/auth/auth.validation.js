@@ -6,7 +6,9 @@ export const loginSchema = z.object({
     userId: z.string().min(1).optional(),
     userCode: z.string().min(1).optional(),
     identifier: z.string().min(1).optional(),
-    password: z.string().min(1, 'Password is required')
+    password: z.string().min(1, 'Password is required'),
+    expectedRole: z.string().optional(),
+    portal: z.string().optional()
   }).refine((data) => data.email || data.userId || data.userCode || data.identifier, {
     message: 'Valid email or User ID is required',
     path: ['email']

@@ -12,10 +12,10 @@ function maskEmail(email) {
   return `${local.slice(0, 2)}***${local.slice(-1)}@${domain}`;
 }
 
-export const login = async ({ email, password, session, ipAddress, userAgent }) => {
+export const login = async ({ email, password, expectedRole, session, ipAddress, userAgent }) => {
   const user = await authRepository.findByEmail(email);
   if (!user) {
-    throw ApiError.unauthorized('Invalid email or password');
+    throw ApiError.unauthorized('Invalid email or User ID');
   }
 
   if (!user.is_active) {
@@ -24,11 +24,54 @@ export const login = async ({ email, password, session, ipAddress, userAgent }) 
 
   const isPasswordValid = await bcrypt.compare(password, user.password_hash);
   if (!isPasswordValid) {
-    throw ApiError.unauthorized('Invalid email or password');
+    throw ApiError.unauthorized('Invalid password');
+  }
+
+  // Role categorization and access control
+  if (expectedRole) {
+    const roleUpper = (user.role || '').toUpperCase();
+    const expUpper = (expectedRole || '').toUpperCase();
+
+    const portalRoleMap = {
+      'CITIZEN': ['CITIZEN'],
+      'WORKER': ['FIELD_WORKER'],
+      'FIELD_WORKER': ['FIELD_WORKER'],
+      'OFFICER': ['DEPARTMENT_OFFICER'],
+      'DEPARTMENT_OFFICER': ['DEPARTMENT_OFFICER'],
+      'ADMIN': ['SUPER_ADMIN'],
+      'SUPER_ADMIN': ['SUPER_ADMIN']
+    };
+
+    const allowed = portalRoleMap[expUpper] || [expUpper];
+    if (!allowed.includes(roleUpper)) {
+      const roleTitles = {
+        'CITIZEN': 'Citizen',
+        'FIELD_WORKER': 'Contractor & Crew Operations',
+        'DEPARTMENT_OFFICER': 'Department Officer',
+        'SUPER_ADMIN': 'Super Admin'
+      };
+      const portalTitles = {
+        'CITIZEN': 'Citizen Portal',
+        'WORKER': 'Contractor & Crew Operations Gate',
+        'FIELD_WORKER': 'Contractor & Crew Operations Gate',
+        'OFFICER': 'Department Officer Desk',
+        'DEPARTMENT_OFFICER': 'Department Officer Desk',
+        'ADMIN': 'Supervisor Administration Desk',
+        'SUPER_ADMIN': 'Supervisor Administration Desk'
+      };
+
+      const userRoleTitle = roleTitles[roleUpper] || user.role;
+      const expectedPortalTitle = portalTitles[expUpper] || `${expectedRole} Gate`;
+
+      throw ApiError.forbidden(
+        `Access Denied: This account is registered as '${userRoleTitle}' and cannot sign in through the ${expectedPortalTitle}. Please use the corresponding municipal gate.`
+      );
+    }
   }
 
   const userPayload = {
     id: user.id,
+    userCode: user.user_code,
     email: user.email,
     fullName: user.full_name,
     phoneNumber: user.phone_number,
@@ -89,6 +132,7 @@ export const getMe = async (userId) => {
 
   return {
     id: user.id,
+    userCode: user.user_code,
     email: user.email,
     fullName: user.full_name,
     phoneNumber: user.phone_number,
