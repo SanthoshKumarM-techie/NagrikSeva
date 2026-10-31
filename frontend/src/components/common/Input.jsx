@@ -16,6 +16,8 @@ export const Input = forwardRef(({
   readOnly = false,
   autoComplete,
   required = false,
+  readOnly = false,
+  autoComplete,
   className = '',
   rows = 3,
   showPasswordToggle = true,
