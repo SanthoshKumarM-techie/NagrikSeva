@@ -21,6 +21,8 @@ export const Input = forwardRef(({
   onTogglePasswordVisibility,
   enableVoice = false,
   onVoiceChange,
+  readOnly,
+  autoComplete,
   ...props
 }, ref) => {
   const [internalShowPassword, setInternalShowPassword] = useState(false);
