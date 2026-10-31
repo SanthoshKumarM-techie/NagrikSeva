@@ -12,5 +12,9 @@ router.post('/logout', authController.logout);
 router.get('/session', authController.checkSession);
 router.get('/me', authenticate, authController.getMe);
 
+// Self-service password reset via mail OTP (for Citizen, Worker & Department Officer)
+router.post('/forgot-password/request-otp', authController.requestPasswordResetOtp);
+router.post('/forgot-password/reset', authController.resetPasswordWithOtp);
+
 export default router;
 

@@ -199,6 +199,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const requestPasswordResetOtp = async (identifier) => {
+    try {
+      const data = await authApi.requestPasswordResetOtp(identifier);
+      return { success: true, data };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Failed to dispatch verification OTP.' };
+    }
+  };
+
+  const resetPasswordWithOtp = async ({ identifier, otp, newPassword }) => {
+    try {
+      const data = await authApi.resetPasswordWithOtp({ identifier, otp, newPassword });
+      return { success: true, data };
+    } catch (err) {
+      return { success: false, error: err?.message || 'Failed to reset password.' };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -214,6 +232,8 @@ export const AuthProvider = ({ children }) => {
         restoreSession,
         updateUserProfile,
         getDashboardPath,
+        requestPasswordResetOtp,
+        resetPasswordWithOtp,
       }}
     >
       {children}

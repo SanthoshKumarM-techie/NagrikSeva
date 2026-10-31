@@ -14,6 +14,8 @@ export const Input = forwardRef(({
   icon: Icon,
   disabled = false,
   required = false,
+  readOnly = false,
+  autoComplete,
   className = '',
   rows = 3,
   showPasswordToggle = true,

@@ -88,8 +88,77 @@ export const create = async ({
   });
 };
 
+export const createOtp = async ({ userId, email, otpCode, expiresAt }) => {
+  // Invalidate any existing unused OTPs for this user
+  await db.query(`
+    UPDATE password_reset_otps
+    SET is_used = TRUE
+    WHERE user_id = $1 AND is_used = FALSE
+  `, [userId]);
+
+  const query = `
+    INSERT INTO password_reset_otps (user_id, email, otp_code, expires_at)
+    VALUES ($1, LOWER($2), $3, $4)
+    RETURNING id, user_id, email, otp_code, expires_at;
+  `;
+  const result = await db.query(query, [userId, email, otpCode, expiresAt]);
+  return result.rows[0];
+};
+
+export const findValidOtp = async ({ email, otpCode }) => {
+  const query = `
+    SELECT id, user_id, email, otp_code, expires_at, attempts, is_used
+    FROM password_reset_otps
+    WHERE LOWER(email) = LOWER($1)
+      AND otp_code = $2
+      AND is_used = FALSE
+      AND expires_at > NOW()
+    ORDER BY created_at DESC
+    LIMIT 1;
+  `;
+  const result = await db.query(query, [email, otpCode]);
+  return result.rows[0] || null;
+};
+
+export const incrementOtpAttempts = async (id) => {
+  const query = `
+    UPDATE password_reset_otps
+    SET attempts = attempts + 1,
+        is_used = CASE WHEN attempts + 1 >= 5 THEN TRUE ELSE is_used END
+    WHERE id = $1
+    RETURNING attempts, is_used;
+  `;
+  const result = await db.query(query, [id]);
+  return result.rows[0];
+};
+
+export const markOtpUsed = async (id) => {
+  await db.query(`
+    UPDATE password_reset_otps
+    SET is_used = TRUE
+    WHERE id = $1
+  `, [id]);
+};
+
+export const updatePassword = async ({ userId, passwordHash }) => {
+  const query = `
+    UPDATE users
+    SET password_hash = $1,
+        updated_at = NOW()
+    WHERE id = $2
+    RETURNING id, user_code, email, full_name, role;
+  `;
+  const result = await db.query(query, [passwordHash, userId]);
+  return result.rows[0];
+};
+
 export default {
   findByEmail,
   findById,
-  create
+  create,
+  createOtp,
+  findValidOtp,
+  incrementOtpAttempts,
+  markOtpUsed,
+  updatePassword
 };

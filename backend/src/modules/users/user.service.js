@@ -79,7 +79,23 @@ export const createUser = async (userData, adminId, clientInfo = {}) => {
 };
 
 export const updateProfile = async (userId, data) => {
-  const updated = await userRepository.updateProfile(userId, data);
+  let updateData = { ...data };
+  if (data.newPassword) {
+    if (data.newPassword.length < 6) {
+      throw ApiError.badRequest('New password must be at least 6 characters long.');
+    }
+    if (data.currentPassword) {
+      const user = await userRepository.findById(userId);
+      const isMatch = await bcrypt.compare(data.currentPassword, user.password_hash);
+      if (!isMatch) {
+        throw ApiError.badRequest('Current password entered does not match your existing password.');
+      }
+    }
+    const saltRounds = 10;
+    updateData.passwordHash = await bcrypt.hash(data.newPassword, saltRounds);
+  }
+
+  const updated = await userRepository.updateProfile(userId, updateData);
   if (!updated) {
     throw ApiError.notFound('User not found');
   }

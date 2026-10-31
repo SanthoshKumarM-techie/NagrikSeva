@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { NotificationProvider } from './context/NotificationContext';
 import { ComplaintProvider } from './context/ComplaintContext';
 import { ROLES } from './utils/constants';
@@ -97,11 +98,12 @@ const RootRedirect = () => {
 export const App = () => {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <ComplaintProvider>
-            <BrowserRouter>
-              <Routes>
+      <LanguageProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <ComplaintProvider>
+              <BrowserRouter>
+                <Routes>
                 {/* Public Route */}
                 <Route path="/login" element={<Login />} />
 
@@ -188,7 +190,8 @@ export const App = () => {
           </ComplaintProvider>
         </NotificationProvider>
       </AuthProvider>
-    </ThemeProvider>
+    </LanguageProvider>
+  </ThemeProvider>
   );
 };
 

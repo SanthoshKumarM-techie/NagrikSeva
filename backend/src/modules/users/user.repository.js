@@ -113,7 +113,7 @@ export const createWorkerProfile = async ({ userId, specialization, assignedZone
   return result.rows[0];
 };
 
-export const updateProfile = async (id, { fullName, phoneNumber }) => {
+export const updateProfile = async (id, { fullName, phoneNumber, passwordHash, address }) => {
   const updates = [];
   const params = [id];
 
@@ -124,6 +124,14 @@ export const updateProfile = async (id, { fullName, phoneNumber }) => {
   if (phoneNumber !== undefined) {
     params.push(phoneNumber);
     updates.push(`phone = $${params.length}`);
+  }
+  if (passwordHash !== undefined) {
+    params.push(passwordHash);
+    updates.push(`password_hash = $${params.length}`);
+  }
+  if (address !== undefined) {
+    params.push(address);
+    updates.push(`address = $${params.length}`);
   }
 
   updates.push(`updated_at = CURRENT_TIMESTAMP`);

@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldCheck, User, Wrench, Building2, Shield, ArrowRight, CheckCircle2 } from 'lucide-react';
 import ThemeToggle from '../../components/layout/ThemeToggle';
+import LanguageSelector from '../../components/layout/LanguageSelector';
 
 export const PortalSelection = () => {
   const navigate = useNavigate();
@@ -76,7 +77,10 @@ export const PortalSelection = () => {
               </p>
             </div>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2.5">
+            <LanguageSelector />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

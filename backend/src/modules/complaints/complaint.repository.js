@@ -25,7 +25,32 @@ const BASE_COMPLAINT_SELECT = `
          (SELECT a.worker_id FROM worker_assignments a WHERE a.complaint_id = c.id AND a.status != 'CANCELLED' ORDER BY a.assigned_at DESC LIMIT 1) as assigned_worker_id,
          (SELECT u_w.full_name FROM worker_assignments a JOIN users u_w ON a.worker_id = u_w.id WHERE a.complaint_id = c.id AND a.status != 'CANCELLED' ORDER BY a.assigned_at DESC LIMIT 1) as assigned_worker_name,
          (SELECT a.id FROM worker_assignments a WHERE a.complaint_id = c.id AND a.status != 'CANCELLED' ORDER BY a.assigned_at DESC LIMIT 1) as assignment_id,
-         (SELECT a.status FROM worker_assignments a WHERE a.complaint_id = c.id AND a.status != 'CANCELLED' ORDER BY a.assigned_at DESC LIMIT 1) as assignment_status
+         (SELECT a.status FROM worker_assignments a WHERE a.complaint_id = c.id AND a.status != 'CANCELLED' ORDER BY a.assigned_at DESC LIMIT 1) as assignment_status,
+         COALESCE((
+           SELECT json_agg(
+             json_build_object(
+               'id', ct.id,
+               'complaintId', ct.complaint_id,
+               'fromDepartmentId', ct.from_department_id,
+               'fromDepartmentName', fd.name,
+               'fromDepartmentCode', fd.code,
+               'toDepartmentId', ct.to_department_id,
+               'toDepartmentName', td.name,
+               'toDepartmentCode', td.code,
+               'transferredBy', u_tr.full_name,
+               'transferNumber', ct.transfer_number,
+               'reason', ct.reason,
+               'status', ct.receiving_decision,
+               'timestamp', ct.transferred_at,
+               'adminNotes', ct.admin_notes
+             ) ORDER BY ct.transferred_at ASC
+           )
+           FROM complaint_transfers ct
+           LEFT JOIN departments fd ON ct.from_department_id = fd.id
+           LEFT JOIN departments td ON ct.to_department_id = td.id
+           LEFT JOIN users u_tr ON ct.transferred_by = u_tr.id
+           WHERE ct.complaint_id = c.id
+         ), '[]'::json) as transfers
   FROM complaints c
   JOIN complaint_categories cat ON c.category_id = cat.id
   JOIN departments d ON c.current_department_id = d.id

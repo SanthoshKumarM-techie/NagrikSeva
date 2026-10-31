@@ -30,8 +30,25 @@ export const DepartmentTransfers = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  const officerDept = currentUser?.department || 'Road Infrastructure & Maintenance';
+  const officerDept = currentUser?.department || currentUser?.departmentName || 'Roads & Infrastructure';
   const officerDeptId = currentUser?.departmentId || '11111111-1111-1111-1111-111111111101';
+  const isSuperAdmin = (currentUser?.role || '').toLowerCase().includes('admin');
+
+  const normalizeDept = (val) => String(val || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const matchesOfficerDept = (trDeptId, trDeptName) => {
+    if (isSuperAdmin) return true;
+    if (officerDeptId && trDeptId && String(trDeptId).toLowerCase() === String(officerDeptId).toLowerCase()) return true;
+    if (currentUser?.departmentId && trDeptId && String(trDeptId).toLowerCase() === String(currentUser.departmentId).toLowerCase()) return true;
+    
+    const nTr = normalizeDept(trDeptName);
+    const nOff = normalizeDept(officerDept);
+    const nCurr = normalizeDept(currentUser?.departmentName || currentUser?.department);
+    
+    if (nTr && nOff && (nTr === nOff || nTr.includes(nOff) || nOff.includes(nTr))) return true;
+    if (nTr && nCurr && (nTr === nCurr || nTr.includes(nCurr) || nCurr.includes(nTr))) return true;
+    return false;
+  };
 
   const [tab, setTab] = useState('outgoing'); // 'outgoing' | 'incoming' | 'all'
   const [search, setSearch] = useState('');
@@ -112,13 +129,8 @@ export const DepartmentTransfers = () => {
     }
   });
 
-  const incomingTransfers = allTransfers.filter(
-    (tr) => tr.toDepartmentId === officerDeptId || tr.toDepartmentName === officerDept
-  );
-
-  const outgoingTransfers = allTransfers.filter(
-    (tr) => tr.fromDepartmentId === officerDeptId || tr.fromDepartmentName === officerDept
-  );
+  const incomingTransfers = allTransfers.filter(tr => matchesOfficerDept(tr.toDepartmentId, tr.toDepartmentName));
+  const outgoingTransfers = allTransfers.filter(tr => matchesOfficerDept(tr.fromDepartmentId, tr.fromDepartmentName));
 
   const activeList = tab === 'incoming' ? incomingTransfers : tab === 'outgoing' ? outgoingTransfers : allTransfers;
 
