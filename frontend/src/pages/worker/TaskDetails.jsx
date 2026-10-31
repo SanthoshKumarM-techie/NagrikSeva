@@ -307,6 +307,20 @@ export const TaskDetails = () => {
       console.warn('Report delay notice:', err.message);
     }
 
+    const newDelayTimelineEntry = {
+      id: `delay-${Date.now()}`,
+      status: 'DELAY',
+      isDelay: true,
+      delayReason,
+      estimatedCompletionDate: delayRevisedDate,
+      evidenceUrls: delayPhotos,
+      title: `Work Delay: ${delayReason}`,
+      description: delayDescription,
+      timestamp: new Date().toISOString(),
+      author: currentUser?.name || 'Contractor & Crew',
+      role: 'Contractor & Crew'
+    };
+
     setBackendTask(prev => prev ? {
       ...prev,
       delayAlert: {
@@ -315,7 +329,8 @@ export const TaskDetails = () => {
         estimatedCompletionDate: delayRevisedDate,
         evidenceUrls: delayPhotos,
         reportedAt: new Date().toISOString()
-      }
+      },
+      timeline: [...(prev.timeline || []), newDelayTimelineEntry]
     } : null);
 
     setDelayModalOpen(false);

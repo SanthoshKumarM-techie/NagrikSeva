@@ -228,35 +228,84 @@ export const mapBackendComplaint = (c) => {
       }
       return null;
     })(),
-    timeline: (c.status_history || c.timeline || []).map((t, idx) => {
-      const normStatus = normalizeStatus(t.to_status || t.status);
-      const defaultTitle = {
-        [COMPLAINT_STATUS.SUBMITTED]: 'Grievance Registered',
-        [COMPLAINT_STATUS.ACKNOWLEDGED]: 'Complaint Acknowledged',
-        [COMPLAINT_STATUS.DEPARTMENT_REVIEW]: 'Department Review',
-        [COMPLAINT_STATUS.TRANSFERRED]: 'Inter-Department Transfer',
-        [COMPLAINT_STATUS.WORKER_ASSIGNED]: 'Field Crew Assigned',
-        [COMPLAINT_STATUS.INSPECTION]: 'Site Inspection Conducted',
-        [COMPLAINT_STATUS.WORK_IN_PROGRESS]: 'Remediation Work Started',
-        [COMPLAINT_STATUS.VERIFICATION]: 'Submitted for Verification',
-        [COMPLAINT_STATUS.RESOLVED]: 'Resolution Verified & Completed',
-        [COMPLAINT_STATUS.CLOSED]: 'Ticket Closed',
-        [COMPLAINT_STATUS.DISPUTED]: 'Resolution Disputed by Citizen',
-        [COMPLAINT_STATUS.REJECTED]: 'Complaint Rejected'
-      }[normStatus] || (t.title || 'Status Updated');
+    timeline: (() => {
+      const rawHistory = Array.isArray(c.status_history) ? c.status_history : (Array.isArray(c.timeline) ? c.timeline : []);
+      const statusItems = rawHistory.map((t, idx) => {
+        const normStatus = normalizeStatus(t.to_status || t.status);
+        const defaultTitle = {
+          [COMPLAINT_STATUS.SUBMITTED]: 'Grievance Registered',
+          [COMPLAINT_STATUS.ACKNOWLEDGED]: 'Complaint Acknowledged',
+          [COMPLAINT_STATUS.DEPARTMENT_REVIEW]: 'Department Review',
+          [COMPLAINT_STATUS.TRANSFERRED]: 'Inter-Department Transfer',
+          [COMPLAINT_STATUS.WORKER_ASSIGNED]: 'Field Crew Assigned',
+          [COMPLAINT_STATUS.INSPECTION]: 'Site Inspection Conducted',
+          [COMPLAINT_STATUS.WORK_IN_PROGRESS]: 'Remediation Work Started',
+          [COMPLAINT_STATUS.VERIFICATION]: 'Submitted for Verification',
+          [COMPLAINT_STATUS.RESOLVED]: 'Resolution Verified & Completed',
+          [COMPLAINT_STATUS.CLOSED]: 'Ticket Closed',
+          [COMPLAINT_STATUS.DISPUTED]: 'Resolution Disputed by Citizen',
+          [COMPLAINT_STATUS.REJECTED]: 'Complaint Rejected'
+        }[normStatus] || (t.title || 'Status Updated');
 
-      const remarksText = t.remarks || t.note || t.description;
+        const remarksText = t.remarks || t.note || t.description;
 
-      return {
-        id: t.id || `tl-${idx}-${Date.now()}`,
-        status: normStatus,
-        title: (t.title && t.title !== 'Status Updated') ? t.title : defaultTitle,
-        description: remarksText || `Status progressed to ${normStatus}`,
-        timestamp: t.changed_at || t.timestamp || t.created_at || new Date().toISOString(),
-        author: t.changed_by_name || t.author || 'Municipal Staff',
-        role: t.changed_by_role || t.role || 'Staff'
-      };
-    }),
+        return {
+          id: t.id || `tl-${idx}-${Date.now()}`,
+          status: normStatus,
+          title: (t.title && t.title !== 'Status Updated') ? t.title : defaultTitle,
+          description: remarksText || `Status progressed to ${normStatus}`,
+          timestamp: t.changed_at || t.timestamp || t.created_at || new Date().toISOString(),
+          author: t.changed_by_name || t.author || 'Municipal Staff',
+          role: t.changed_by_role || t.role || 'Staff'
+        };
+      });
+
+      // Integrate DELAY updates into the chronological timeline
+      const delayItems = (Array.isArray(c.work_updates) ? c.work_updates : [])
+        .filter(wu => wu.update_type === 'DELAY')
+        .map(wu => {
+          let details = {};
+          try {
+            details = typeof wu.technical_details === 'string' ? JSON.parse(wu.technical_details) : (wu.technical_details || {});
+          } catch (_) { details = {}; }
+          return {
+            id: wu.id,
+            status: 'DELAY',
+            isDelay: true,
+            delayReason: details.delayReason || 'Site Work Delay',
+            estimatedCompletionDate: details.estimatedCompletionDate,
+            evidenceUrls: details.evidenceUrls || wu.evidence_urls || [],
+            title: `Work Delay: ${details.delayReason || 'Site Obstruction'}`,
+            description: wu.notes || wu.description || `Delay reported by field crew. Target completion: ${details.estimatedCompletionDate}`,
+            timestamp: wu.created_at,
+            author: wu.worker_name || 'Contractor & Crew',
+            role: 'Contractor & Crew'
+          };
+        });
+
+      // Combine and chronologically sort all activity events
+      const allEvents = [...statusItems, ...delayItems].sort(
+        (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+      );
+
+      // Clean deduplication: remove consecutive identical events to prevent clutter
+      const deduped = [];
+      for (let i = 0; i < allEvents.length; i++) {
+        const curr = allEvents[i];
+        const prev = deduped[deduped.length - 1];
+        if (
+          prev &&
+          prev.status === curr.status &&
+          prev.title === curr.title &&
+          prev.description === curr.description &&
+          Math.abs(new Date(curr.timestamp) - new Date(prev.timestamp)) < 24 * 3600 * 1000
+        ) {
+          continue;
+        }
+        deduped.push(curr);
+      }
+      return deduped;
+    })(),
     transfers: (Array.isArray(c.transfers) ? c.transfers : []).map(tr => ({
       id: tr.id,
       complaintId: tr.complaintId || tr.complaint_id || c.id,
@@ -1087,9 +1136,38 @@ export const ComplaintProvider = ({ children }) => {
       return updated;
     });
 
+    // Multi-role real-time notifications for Citizen, Department, and Admin
+    const ticketNo = targetComp?.ticketNumber || complaintId;
+    const compDbId = targetComp?.id || complaintId;
+    const citizenTargetId = targetComp?.citizenId || targetComp?.citizen_id || targetComp?.submittedBy || 'CIT001';
+    const deptTargetId = targetComp?.departmentId || targetComp?.department_id || 'OFF001';
+
+    // 1. Citizen Notification
     addNotification({
-      title: 'Work Delay Logged',
-      message: `Delay reported for #${targetComp?.ticketNumber || complaintId}: ${delayReason}. Notifications sent to citizen, department, and super admin.`,
+      userId: citizenTargetId,
+      role: ROLES.CITIZEN,
+      title: `Work Delay Notice: #${ticketNo}`,
+      message: `Contractor reported a delay for #${ticketNo} (${delayReason}): "${description}". Revised target completion date: ${estimatedCompletionDate}.`,
+      complaintId: compDbId,
+      type: 'warning'
+    });
+
+    // 2. Department Officer Notification
+    addNotification({
+      userId: deptTargetId,
+      role: ROLES.OFFICER,
+      title: `Contractor Work Delay: #${ticketNo}`,
+      message: `Field crew reported an on-site delay on #${ticketNo} (${delayReason}): "${description}". Revised target: ${estimatedCompletionDate}.`,
+      complaintId: compDbId,
+      type: 'warning'
+    });
+
+    // 3. Super Admin Alert
+    addNotification({
+      role: ROLES.ADMIN,
+      title: `Civic Work Delay Alert: #${ticketNo}`,
+      message: `Delay logged on #${ticketNo} (${delayReason}). Target revised to ${estimatedCompletionDate}.`,
+      complaintId: compDbId,
       type: 'warning'
     });
 

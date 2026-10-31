@@ -2,13 +2,13 @@ import notificationRepository from './notification.repository.js';
 import ApiError from '../../utils/ApiError.js';
 import db from '../../config/database.js';
 
-export async function sendNotification({ userId, title, message, complaintId, type, data }, clientDb = db) {
+export async function sendNotification({ userId, title, message, complaintId, type, notificationType, data }, clientDb = db) {
   const notif = await notificationRepository.createNotification({
     user_id: userId,
     title,
     message,
     complaint_id: complaintId || (data && data.complaintId) || null,
-    type: type || 'SYSTEM'
+    type: type || notificationType || 'SYSTEM'
   }, clientDb);
 
   return notif;
@@ -33,9 +33,14 @@ export async function notifyDepartmentOfficers(firstArg, secondArg, db) {
   const complaintId = payload.complaintId;
   const type = payload.type || payload.notificationType || 'DEPARTMENT_ALERT';
 
-  if (!targetDeptId) return [];
+  let officers = [];
+  if (targetDeptId) {
+    officers = await notificationRepository.getUsersByRoleAndDepartment('DEPARTMENT_OFFICER', targetDeptId, db);
+  }
+  if (!officers || officers.length === 0) {
+    officers = await notificationRepository.getUsersByRoleAndDepartment('DEPARTMENT_OFFICER', null, db);
+  }
 
-  const officers = await notificationRepository.getUsersByRoleAndDepartment('DEPARTMENT_OFFICER', targetDeptId, db);
   const promises = officers.map((off) =>
     notificationRepository.createNotification({
       user_id: off.id,

@@ -15,9 +15,12 @@ export const Notifications = () => {
 
   const [filter, setFilter] = useState('all'); // all, unread
 
-  const userNotifs = notifications.filter(
-    (n) => !currentUser?.id || n.userId === currentUser?.id || n.userId === currentUser?.userCode || n.role === 'Citizen' || !n.userId
-  );
+  const userNotifs = notifications.filter((n) => {
+    if (!currentUser?.id && !role) return true;
+    if (n.userId && (n.userId === currentUser?.id || n.userId === currentUser?.userCode)) return true;
+    if (n.role && (n.role === role || n.role?.toLowerCase() === role?.toLowerCase())) return true;
+    return !n.userId && !n.role;
+  });
 
   const filteredNotifs = userNotifs.filter((n) => {
     if (filter === 'unread') return !n.read;
@@ -27,7 +30,15 @@ export const Notifications = () => {
   const handleNotificationClick = (n) => {
     markAsRead(n.id);
     if (n.complaintId) {
-      navigate(`/citizen/complaints/${n.complaintId}`);
+      if (role === 'Department Officer' || role === 'DEPARTMENT_OFFICER') {
+        navigate(`/officer/complaints/${n.complaintId}`);
+      } else if (role === 'Contractor & Crew Operations' || role === 'FIELD_WORKER') {
+        navigate(`/worker/tasks/${n.complaintId}`);
+      } else if (role === 'Super Admin' || role === 'SUPER_ADMIN') {
+        navigate(`/admin/complaints`);
+      } else {
+        navigate(`/citizen/complaints/${n.complaintId}`);
+      }
     }
   };
 

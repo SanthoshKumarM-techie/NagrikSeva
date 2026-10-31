@@ -31,19 +31,35 @@ export const NotificationProvider = ({ children }) => {
       setLoading(true);
       const data = await notificationsApi.getNotifications();
       const mapped = (data || []).map(mapBackendNotification);
-      setNotifications(mapped);
-      setStorage(STORAGE_KEYS.NOTIFICATIONS, mapped);
+
+      setNotifications(prev => {
+        const localCached = getStorage(STORAGE_KEYS.NOTIFICATIONS, []) || prev || [];
+        const combined = [...mapped];
+        for (const local of localCached) {
+          if (!combined.some(c => c.id === local.id || (c.title === local.title && c.complaintId === local.complaintId && c.userId === local.userId))) {
+            combined.push(local);
+          }
+        }
+        setStorage(STORAGE_KEYS.NOTIFICATIONS, combined);
+        return combined;
+      });
 
       const count = await notificationsApi.getUnreadCount();
-      setUnreadCount(typeof count === 'number' ? count : mapped.filter(n => !n.read).length);
+      if (typeof count === 'number') {
+        setUnreadCount(count);
+      } else {
+        const stored = getStorage(STORAGE_KEYS.NOTIFICATIONS, []);
+        const unread = stored.filter(n => !n.read && (!currentUser.id || n.userId === currentUser.id || n.userId === currentUser.userCode || n.role === currentUser.role)).length;
+        setUnreadCount(unread);
+      }
     } catch {
-      // Fallback to existing notifications state
-      const count = notifications.filter(n => !n.read).length;
+      const stored = getStorage(STORAGE_KEYS.NOTIFICATIONS, notifications);
+      const count = stored.filter(n => !n.read && (!currentUser?.id || n.userId === currentUser.id || n.userId === currentUser.userCode || n.role === currentUser.role)).length;
       setUnreadCount(count);
     } finally {
       setLoading(false);
     }
-  }, [currentUser, notifications]);
+  }, [currentUser]);
 
   useEffect(() => {
     if (currentUser) {
@@ -51,21 +67,28 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [currentUser, fetchNotifications]);
 
-  const addNotification = ({ userId, role, title, message, complaintId, type = 'info' }) => {
-    const newNotif = {
-      id: `NOTIF-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      userId,
-      role,
-      title,
-      message,
-      complaintId,
-      type,
+  const addNotification = (notifData) => {
+    const list = Array.isArray(notifData) ? notifData : [notifData];
+    const createdNotifs = list.map(item => ({
+      id: item.id || `NOTIF-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+      userId: item.userId || null,
+      role: item.role || null,
+      title: item.title,
+      message: item.message,
+      complaintId: item.complaintId || null,
+      type: item.type || 'info',
       read: false,
-      timestamp: new Date().toISOString()
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-    setUnreadCount(prev => prev + 1);
-    return newNotif;
+      timestamp: item.timestamp || new Date().toISOString()
+    }));
+
+    setNotifications(prev => {
+      const updated = [...createdNotifs, ...prev];
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, updated);
+      return updated;
+    });
+
+    setUnreadCount(prev => prev + createdNotifs.length);
+    return createdNotifs[0];
   };
 
   const markAsRead = async (id) => {
@@ -74,9 +97,11 @@ export const NotificationProvider = ({ children }) => {
     } catch (err) {
       console.warn('Backend markAsRead warning:', err.message);
     }
-    setNotifications(prev =>
-      prev.map(n => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifications(prev => {
+      const updated = prev.map(n => (n.id === id ? { ...n, read: true } : n));
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, updated);
+      return updated;
+    });
     setUnreadCount(prev => Math.max(0, prev - 1));
   };
 
@@ -86,19 +111,26 @@ export const NotificationProvider = ({ children }) => {
     } catch (err) {
       console.warn('Backend markAllAsRead warning:', err.message);
     }
-    setNotifications(prev =>
-      prev.map(n => ({ ...n, read: true }))
-    );
+    setNotifications(prev => {
+      const updated = prev.map(n => ({ ...n, read: true }));
+      setStorage(STORAGE_KEYS.NOTIFICATIONS, updated);
+      return updated;
+    });
     setUnreadCount(0);
   };
 
-  const getUserNotifications = (userId) => {
-    return notifications.filter(n => !userId || n.userId === userId);
+  const getUserNotifications = (userId, role = null) => {
+    return notifications.filter(n => {
+      if (!userId && !role) return true;
+      if (userId && (n.userId === userId || (currentUser?.userCode && n.userId === currentUser.userCode))) return true;
+      if (role && (n.role === role || n.role?.toLowerCase() === role?.toLowerCase())) return true;
+      return !n.userId && !n.role;
+    });
   };
 
-  const getUnreadCount = (userId) => {
-    if (!userId) return unreadCount;
-    return notifications.filter(n => n.userId === userId && !n.read).length;
+  const getUnreadCount = (userId, role = null) => {
+    const userList = getUserNotifications(userId, role);
+    return userList.filter(n => !n.read).length;
   };
 
   return (

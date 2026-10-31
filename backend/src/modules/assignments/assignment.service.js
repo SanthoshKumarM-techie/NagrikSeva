@@ -353,32 +353,33 @@ export const reportWorkDelay = async (assignmentId, workerId, data, clientInfo =
       remarks: `Work Delay Reported by Contractor: "${delayReason}" - ${description}. Revised Target Date: ${estimatedCompletionDate}. Delay photographic proof attached.`
     }, client);
 
-    // 4. Multi-role Notifications:
-    // A) Notify Citizen
-    notificationService.notifyUser({
-      userId: assignment.citizen_id,
-      complaintId: assignment.complaint_id,
-      title: 'Work Delay Notification',
-      message: `Contractor reported an on-site delay for #${assignment.ticket_number}: ${delayReason}. "${description}". Expected completion: ${estimatedCompletionDate}.`,
-      notificationType: 'WORK_DELAY'
-    }).catch(console.error);
-
-    // B) Notify Department Officers
-    notificationService.notifyDepartmentOfficers({
-      departmentId: assignment.department_id,
-      complaintId: assignment.complaint_id,
-      title: 'On-Site Work Delay Flagged',
-      message: `Worker ${assignment.worker_name} reported delay for #${assignment.ticket_number}: ${delayReason} - "${description}". Revised completion: ${estimatedCompletionDate}.`,
-      notificationType: 'DEPARTMENT_ALERT'
-    }).catch(console.error);
-
-    // C) Notify Super Admins
-    notificationService.notifyAdmins({
-      complaintId: assignment.complaint_id,
-      title: 'Civic Work Delay Alert',
-      message: `Work delay flagged on #${assignment.ticket_number} (${delayReason}). Revised completion target: ${estimatedCompletionDate}.`,
-      type: 'ADMIN_ALERT'
-    }).catch(console.error);
+    // 4. Multi-role Notifications (immediately persisted):
+    try {
+      await Promise.allSettled([
+        notificationService.notifyUser({
+          userId: assignment.citizen_id,
+          complaintId: assignment.complaint_id,
+          title: `Work Delay Reported: #${assignment.ticket_number}`,
+          message: `Contractor reported an on-site work delay for #${assignment.ticket_number} (${delayReason}): "${description}". Revised completion target: ${estimatedCompletionDate}.`,
+          type: 'WORK_DELAY'
+        }),
+        notificationService.notifyDepartmentOfficers({
+          departmentId: assignment.department_id,
+          complaintId: assignment.complaint_id,
+          title: `Field Work Delay: #${assignment.ticket_number}`,
+          message: `Field worker ${assignment.worker_name} reported on-site delay for #${assignment.ticket_number} (${delayReason}): "${description}". Revised target: ${estimatedCompletionDate}.`,
+          type: 'DEPARTMENT_ALERT'
+        }),
+        notificationService.notifyAdmins({
+          complaintId: assignment.complaint_id,
+          title: `Civic Work Delay Alert: #${assignment.ticket_number}`,
+          message: `Work delay flagged on #${assignment.ticket_number} (${delayReason}). Revised completion target: ${estimatedCompletionDate}.`,
+          type: 'ADMIN_ALERT'
+        })
+      ]);
+    } catch (notifErr) {
+      console.warn('Notification dispatch warning:', notifErr.message);
+    }
 
     auditService.logEvent({
       userId: workerId,

@@ -31,10 +31,15 @@ export const Header = ({ onMobileMenuClick }) => {
   const userMenuRef = useRef(null);
   const notifMenuRef = useRef(null);
 
-  const unreadCount = getUnreadCount(currentUser?.id);
+  const unreadCount = getUnreadCount(currentUser?.id, role);
   const userNotifs = notifications
-    .filter(n => !currentUser?.id || n.userId === currentUser?.id || n.role === role)
-    .slice(0, 5);
+    .filter(n => {
+      if (!currentUser?.id && !role) return true;
+      if (n.userId && (n.userId === currentUser?.id || n.userId === currentUser?.userCode)) return true;
+      if (n.role && (n.role === role || n.role?.toLowerCase() === role?.toLowerCase())) return true;
+      return !n.userId && !n.role;
+    })
+    .slice(0, 10);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
