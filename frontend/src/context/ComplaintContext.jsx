@@ -439,6 +439,7 @@ export const ComplaintProvider = ({ children }) => {
               avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80'
             }));
             setWorkers(mappedWorkers);
+            setStorage(STORAGE_KEYS.WORKERS, mappedWorkers);
           }
         } catch {
           // Silent fallback

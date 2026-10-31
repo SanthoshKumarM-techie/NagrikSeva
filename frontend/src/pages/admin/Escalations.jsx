@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertOctagon,
@@ -9,7 +9,9 @@ import {
   CheckCircle2,
   Building2,
   ArrowRight,
-  Filter
+  Filter,
+  RefreshCw,
+  UserCheck
 } from 'lucide-react';
 import { useComplaints } from '../../context/ComplaintContext';
 import PageHeader from '../../components/layout/PageHeader';
@@ -22,75 +24,161 @@ import Input from '../../components/common/Input';
 import { formatDate, formatDateTime } from '../../utils/statusHelpers';
 
 import escalationsApi from '../../api/escalations.api';
-import { INITIAL_WORKERS } from '../../data/mockWorkers';
+import usersApi from '../../api/users.api';
 
 export const Escalations = () => {
   const { complaints, workers, assignWorker } = useComplaints();
   const navigate = useNavigate();
 
   const [backendEscalations, setBackendEscalations] = useState(null);
+  const [liveWorkers, setLiveWorkers] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [levelFilter, setLevelFilter] = useState('');
   const [selectedEscalation, setSelectedEscalation] = useState(null);
   const [interventionModalOpen, setInterventionModalOpen] = useState(false);
   const [interventionWorkerId, setInterventionWorkerId] = useState('');
   const [interventionNotes, setInterventionNotes] = useState('');
+  const [isDispatching, setIsDispatching] = useState(false);
+  const [dispatchError, setDispatchError] = useState('');
+  const [successToast, setSuccessToast] = useState('');
 
-  useEffect(() => {
-    let isMounted = true;
-    escalationsApi.listEscalations().then((res) => {
-      if (isMounted && res) {
+  const loadEscalations = useCallback(async () => {
+    try {
+      const res = await escalationsApi.listEscalations();
+      if (res) {
         setBackendEscalations(res);
       }
-    }).catch(() => {});
-    return () => { isMounted = false; };
+    } catch (err) {
+      console.warn('Failed to fetch backend escalations:', err?.message || err);
+    }
   }, []);
+
+  const loadWorkers = useCallback(async () => {
+    try {
+      const wList = await usersApi.getDepartmentWorkers();
+      if (wList && Array.isArray(wList) && wList.length > 0) {
+        setLiveWorkers(wList);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch live workers for escalations:', err?.message || err);
+    }
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([loadEscalations(), loadWorkers()]).finally(() => {
+      setLoading(false);
+    });
+  }, [loadEscalations, loadWorkers]);
+
+  // Combined available workers list prioritizing live DB records
+  const availableWorkers = liveWorkers.length > 0
+    ? liveWorkers.map(w => ({
+        id: w.id,
+        name: w.full_name || w.name,
+        department: w.department_name || w.department || 'Municipal Maintenance',
+        departmentId: w.department_id,
+        rating: w.rating || 4.8
+      }))
+    : workers;
 
   // Collect complaints that have active escalation or disputed status
   const escalatedComplaints = backendEscalations && backendEscalations.length > 0
-    ? backendEscalations.map(e => ({
-        id: e.complaint_id || e.id,
-        ticketNumber: e.ticket_number || `BLR-${e.id?.slice(0, 8)}`,
-        title: e.complaint_title || 'Civic Issue Under Escalation',
-        location: e.street_location || 'Ward Location',
-        department: e.department_name || 'Municipal Department',
-        escalationLevel: e.level === 'LEVEL_3' ? 3 : e.level === 'LEVEL_2' ? 2 : 1,
-        escalationTitle: e.level === 'LEVEL_3' ? 'Municipal Administrator' : e.level === 'LEVEL_2' ? 'Department Supervisor' : 'Department Officer',
-        overdueHours: 24,
-        escalatedAt: e.created_at || new Date().toISOString(),
-        responsibleOfficer: e.assigned_to_name || 'Designated Zonal Lead',
-        priority: e.priority || 'HIGH',
-        status: e.status || 'Escalated'
-      }))
+    ? backendEscalations
+        .filter(e => e.status !== 'RESOLVED' && e.status !== 'CLOSED')
+        .map(e => ({
+          id: e.complaint_id || e.id,
+          complaintId: e.complaint_id || e.id,
+          escalationId: e.id,
+          ticketNumber: e.ticket_number || `BLR-${(e.complaint_id || e.id)?.slice(0, 8)}`,
+          title: e.complaint_title || 'Civic Issue Under Escalation',
+          location: e.complaint_address || e.street_location || 'Ward Location',
+          department: e.department_name || 'Municipal Department',
+          departmentId: e.department_id,
+          escalationLevel: e.level === 'LEVEL_3' ? 3 : e.level === 'LEVEL_2' ? 2 : 1,
+          escalationTitle: e.level === 'LEVEL_3' ? 'Municipal Administrator' : e.level === 'LEVEL_2' ? 'Department Supervisor' : 'Department Officer',
+          overdueHours: 24,
+          escalatedAt: e.created_at || new Date().toISOString(),
+          responsibleOfficer: e.assigned_to_name || 'Designated Zonal Lead',
+          priority: e.complaint_priority || e.priority || 'HIGH',
+          status: e.status || 'Escalated'
+        }))
     : complaints
-        .filter((c) => c.isEscalated || c.status === 'Disputed' || c.status === 'DISPUTED')
-        .map((c) => {
-          return {
-            ...c,
-            escalationLevel: c.escalationLevel || 2,
-            escalationTitle: c.escalationLevel === 3 ? 'Municipal Administrator' : 'Department Supervisor',
-            overdueHours: 32,
-            escalatedAt: c.submittedAt,
-            responsibleOfficer: c.assignedWorkerName || 'Designated Zonal Lead',
-          };
-        });
+        .filter((c) => (c.isEscalated || c.status === 'Disputed' || c.status === 'DISPUTED') && c.status !== 'RESOLVED' && c.status !== 'Closed')
+        .map((c) => ({
+          ...c,
+          id: c.id,
+          complaintId: c.id,
+          escalationId: c.escalationId || null,
+          escalationLevel: c.escalationLevel || 2,
+          escalationTitle: c.escalationLevel === 3 ? 'Municipal Administrator' : 'Department Supervisor',
+          overdueHours: 32,
+          escalatedAt: c.submittedAt,
+          responsibleOfficer: c.assignedWorkerName || 'Designated Zonal Lead',
+        }));
 
   const filtered = escalatedComplaints.filter((item) => {
     if (!levelFilter) return true;
     return String(item.escalationLevel) === String(levelFilter);
   });
 
-  const handleInterventionSubmit = () => {
-    if (!selectedEscalation || !interventionWorkerId) {
+  const handleOpenIntervene = (row) => {
+    setSelectedEscalation(row);
+    // Find worker from same department if available, or first available
+    const sameDeptWorker = availableWorkers.find(w => w.departmentId && row.departmentId && w.departmentId === row.departmentId);
+    const defaultWorker = sameDeptWorker || availableWorkers[0];
+    setInterventionWorkerId(defaultWorker?.id || '');
+    setInterventionNotes('');
+    setDispatchError('');
+    setInterventionModalOpen(true);
+  };
+
+  const handleInterventionSubmit = async () => {
+    if (!selectedEscalation) return;
+    if (!interventionWorkerId) {
       alert('Please select an emergency crew.');
       return;
     }
-    assignWorker(
-      selectedEscalation.id,
-      interventionWorkerId,
-      `ADMINISTRATIVE EMERGENCY DISPATCH: ${interventionNotes}`,
-      { name: 'Municipal Administrator', role: 'Super Admin' }
-    );
-    setInterventionModalOpen(false);
+
+    setIsDispatching(true);
+    setDispatchError('');
+
+    try {
+      const complaintId = selectedEscalation.complaintId || selectedEscalation.id;
+      const notes = interventionNotes?.trim() || 'ADMINISTRATIVE DIRECTIVE: Immediate site remediation dispatched by Super Admin.';
+
+      // 1. Dispatch worker assignment via Context & Backend API
+      await assignWorker(
+        complaintId,
+        interventionWorkerId,
+        `ADMINISTRATIVE EMERGENCY DISPATCH: ${notes}`,
+        { name: 'Municipal Administrator', role: 'SUPER_ADMIN' },
+        selectedEscalation.ticketNumber || complaintId
+      );
+
+      // 2. Resolve escalation record on backend if escalationId is available
+      const escId = selectedEscalation.escalationId;
+      if (escId) {
+        try {
+          await escalationsApi.resolveEscalation(escId, `Emergency crew dispatched by Super Admin. Directive: ${notes}`);
+        } catch (escErr) {
+          console.warn('Backend resolve escalation note:', escErr);
+        }
+      }
+
+      // 3. Immediately refresh escalations list
+      await loadEscalations();
+
+      // 4. Close modal and show feedback
+      setInterventionModalOpen(false);
+      setSuccessToast(`Emergency mandate dispatched successfully for ticket ${selectedEscalation.ticketNumber || complaintId}. Specialist crew deployed.`);
+      setTimeout(() => setSuccessToast(''), 6000);
+    } catch (err) {
+      console.error('Intervention dispatch failed:', err);
+      setDispatchError(err?.message || 'Failed to dispatch emergency order. Please try again.');
+    } finally {
+      setIsDispatching(false);
+    }
   };
 
   const columns = [
@@ -99,6 +187,16 @@ export const Escalations = () => {
       accessor: 'id',
       sortable: true,
       className: 'font-mono font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap',
+      render: (row) => (
+        <div>
+          <span className="font-mono font-bold text-rose-600 dark:text-rose-400">
+            {row.ticketNumber || row.id?.slice(0, 8)}
+          </span>
+          <span className="block text-[10px] text-slate-400 font-normal font-mono truncate max-w-[120px]">
+            {row.id}
+          </span>
+        </div>
+      )
     },
     {
       header: 'Grievance & Location',
@@ -158,12 +256,8 @@ export const Escalations = () => {
           <Button
             size="sm"
             variant="danger"
-            onClick={() => {
-              setSelectedEscalation(row);
-              setInterventionWorkerId(workers[0]?.id || '');
-              setInterventionNotes('');
-              setInterventionModalOpen(true);
-            }}
+            icon={AlertOctagon}
+            onClick={() => handleOpenIntervene(row)}
           >
             Intervene
           </Button>
@@ -178,7 +272,29 @@ export const Escalations = () => {
         title="Municipal SLA Escalation Command"
         description="Monitor grievances exceeding statutory turnaround times or contested by citizen disputes."
         tag={`${escalatedComplaints.length} Escalated Cases`}
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            icon={RefreshCw}
+            onClick={() => {
+              setLoading(true);
+              Promise.all([loadEscalations(), loadWorkers()]).finally(() => setLoading(false));
+            }}
+            disabled={loading}
+          >
+            Refresh
+          </Button>
+        }
       />
+
+      {/* Success Notification Toast */}
+      {successToast && (
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-3 animate-fade-in shadow-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <span className="font-semibold">{successToast}</span>
+        </div>
+      )}
 
       {/* Tier Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -245,21 +361,37 @@ export const Escalations = () => {
       {/* Admin Executive Intervention Modal */}
       <Modal
         isOpen={interventionModalOpen}
-        onClose={() => setInterventionModalOpen(false)}
-        title={`Executive Intervention: ${selectedEscalation?.id}`}
+        onClose={() => !isDispatching && setInterventionModalOpen(false)}
+        title={`Executive Intervention: ${selectedEscalation?.ticketNumber || selectedEscalation?.id}`}
         description="Override department queues to deploy dedicated emergency contractors or reassign task force."
         footer={
           <>
-            <Button variant="secondary" onClick={() => setInterventionModalOpen(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => setInterventionModalOpen(false)}
+              disabled={isDispatching}
+            >
               Cancel
             </Button>
-            <Button variant="danger" icon={AlertOctagon} onClick={handleInterventionSubmit}>
-              Dispatch Emergency Order
+            <Button
+              variant="danger"
+              icon={AlertOctagon}
+              onClick={handleInterventionSubmit}
+              disabled={isDispatching}
+            >
+              {isDispatching ? 'Dispatching Emergency Order...' : 'Dispatch Emergency Order'}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
+          {dispatchError && (
+            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+              <span>{dispatchError}</span>
+            </div>
+          )}
+
           <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-300">
             <strong>Critical Alert:</strong> Complaint has exceeded SLA thresholds by +{selectedEscalation?.overdueHours} hours.
           </div>
@@ -268,20 +400,22 @@ export const Escalations = () => {
             label="Reassign Dedicated Specialist"
             value={interventionWorkerId}
             onChange={(e) => setInterventionWorkerId(e.target.value)}
-            options={workers.map((w) => ({
+            options={availableWorkers.map((w) => ({
               value: w.id,
-              label: `${w.name} (${w.department}) &mdash; Rating: ${w.rating}`,
+              label: `${w.name} (${w.department}) — Rating: ${w.rating}`,
             }))}
+            disabled={isDispatching}
             required
           />
 
           <Input
-            label="Executive Directive &amp; Remediation Instructions"
+            label="Executive Directive & Remediation Instructions"
             type="textarea"
             rows={3}
             placeholder="Issue direct mandate to resolve within 12 hours with photographic proof..."
             value={interventionNotes}
             onChange={(e) => setInterventionNotes(e.target.value)}
+            disabled={isDispatching}
           />
         </div>
       </Modal>
@@ -290,4 +424,3 @@ export const Escalations = () => {
 };
 
 export default Escalations;
-
