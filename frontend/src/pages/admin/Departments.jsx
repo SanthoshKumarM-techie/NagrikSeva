@@ -143,8 +143,15 @@ export const Departments = () => {
           });
           setCredentialsModalOpen(true);
         } else {
-          setSuccessToast(`Department "${formData.name}" registered successfully.`);
-          setTimeout(() => setSuccessToast(''), 4000);
+          setCreatedOfficer({
+            userCode: nextOfficerId,
+            fullName: formData.headOfficer || `${formData.name} Nodal Officer`,
+            email: formData.email || `${cleanCode.toLowerCase()}.grievance@bbmp.gov.in`,
+            temporaryPassword: formData.initialPassword.trim() || 'officer123',
+            departmentName: formData.name,
+            departmentCode: cleanCode
+          });
+          setCredentialsModalOpen(true);
         }
       }
     } catch (err) {

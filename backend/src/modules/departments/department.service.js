@@ -100,7 +100,7 @@ export const createDepartment = async (data, adminId, clientInfo = {}) => {
     } else {
       const newUserRes = await db.query(`
         INSERT INTO users (
-          user_code, password_hash, full_name, email, phone, role, department_id, address, is_active, is_verified
+          user_code, password_hash, full_name, email, phone, role, department_id, address, is_active, identity_verified
         ) VALUES (
           $1, $2, $3, $4, $5, 'DEPARTMENT_OFFICER', $6, $7, TRUE, TRUE
         )
