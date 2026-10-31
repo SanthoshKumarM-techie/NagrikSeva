@@ -97,8 +97,8 @@ export const updateStatus = async (id, { status, resolvedBy, resolutionNotes }, 
     SET status = $2::escalation_status,
         acknowledged_at = CASE WHEN $2 = 'ACKNOWLEDGED' AND acknowledged_at IS NULL THEN CURRENT_TIMESTAMP ELSE acknowledged_at END,
         resolved_at = CASE WHEN $2 = 'RESOLVED' THEN CURRENT_TIMESTAMP ELSE resolved_at END,
-        assigned_to = CASE WHEN $3 IS NOT NULL THEN $3 ELSE assigned_to END,
-        resolution_notes = CASE WHEN $4 IS NOT NULL THEN $4 ELSE resolution_notes END
+        assigned_to = CASE WHEN $3::uuid IS NOT NULL THEN $3::uuid ELSE assigned_to END,
+        resolution_notes = CASE WHEN $4::text IS NOT NULL THEN $4::text ELSE resolution_notes END
     WHERE id = $1
     RETURNING id, complaint_id, status, acknowledged_at, resolved_at, resolution_notes;
   `;

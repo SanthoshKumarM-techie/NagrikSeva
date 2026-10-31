@@ -11,7 +11,9 @@ import {
   ArrowRight,
   Filter,
   RefreshCw,
-  UserCheck
+  UserCheck,
+  CheckCircle,
+  FileCheck2
 } from 'lucide-react';
 import { useComplaints } from '../../context/ComplaintContext';
 import PageHeader from '../../components/layout/PageHeader';
@@ -33,6 +35,7 @@ export const Escalations = () => {
   const [backendEscalations, setBackendEscalations] = useState(null);
   const [liveWorkers, setLiveWorkers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [viewTab, setViewTab] = useState('ACTIVE'); // 'ACTIVE' | 'RESOLVED'
   const [levelFilter, setLevelFilter] = useState('');
   const [selectedEscalation, setSelectedEscalation] = useState(null);
   const [interventionModalOpen, setInterventionModalOpen] = useState(false);
@@ -82,8 +85,8 @@ export const Escalations = () => {
       }))
     : workers;
 
-  // Collect complaints that have active escalation or disputed status
-  const escalatedComplaints = backendEscalations && backendEscalations.length > 0
+  // Active complaints that have open escalation
+  const activeEscalatedComplaints = backendEscalations && backendEscalations.length > 0
     ? backendEscalations
         .filter(e => e.status !== 'RESOLVED' && e.status !== 'CLOSED')
         .map(e => ({
@@ -117,14 +120,33 @@ export const Escalations = () => {
           responsibleOfficer: c.assignedWorkerName || 'Designated Zonal Lead',
         }));
 
-  const filtered = escalatedComplaints.filter((item) => {
+  // Dispatched & resolved escalations archive
+  const resolvedEscalations = backendEscalations && backendEscalations.length > 0
+    ? backendEscalations
+        .filter(e => e.status === 'RESOLVED' || e.status === 'CLOSED')
+        .map(e => ({
+          id: e.complaint_id || e.id,
+          complaintId: e.complaint_id || e.id,
+          escalationId: e.id,
+          ticketNumber: e.ticket_number || `BLR-${(e.complaint_id || e.id)?.slice(0, 8)}`,
+          title: e.complaint_title || 'Civic Grievance Under Remediation',
+          location: e.complaint_address || e.street_location || 'Ward Location',
+          department: e.department_name || 'Municipal Department',
+          escalationLevel: e.level === 'LEVEL_3' ? 3 : e.level === 'LEVEL_2' ? 2 : 1,
+          resolvedAt: e.resolved_at || e.updated_at || new Date().toISOString(),
+          resolutionNotes: e.resolution_notes || 'Executive intervention mandate issued by Administrator. Dedicated emergency specialist deployed.',
+          resolvedBy: e.resolved_by_name || 'Super Admin',
+          status: 'RESOLVED'
+        }))
+    : [];
+
+  const filteredActive = activeEscalatedComplaints.filter((item) => {
     if (!levelFilter) return true;
     return String(item.escalationLevel) === String(levelFilter);
   });
 
   const handleOpenIntervene = (row) => {
     setSelectedEscalation(row);
-    // Find worker from same department if available, or first available
     const sameDeptWorker = availableWorkers.find(w => w.departmentId && row.departmentId && w.departmentId === row.departmentId);
     const defaultWorker = sameDeptWorker || availableWorkers[0];
     setInterventionWorkerId(defaultWorker?.id || '');
@@ -166,13 +188,26 @@ export const Escalations = () => {
         }
       }
 
-      // 3. Immediately refresh escalations list
+      // 3. Immediately mark as resolved in local state
+      setBackendEscalations(prev => (prev || []).map(e => {
+        if (e.id === escId || e.complaint_id === complaintId) {
+          return {
+            ...e,
+            status: 'RESOLVED',
+            resolved_at: new Date().toISOString(),
+            resolution_notes: `ADMINISTRATIVE DIRECTIVE: ${notes}`
+          };
+        }
+        return e;
+      }));
+
+      // 4. Refresh escalations list from server
       await loadEscalations();
 
-      // 4. Close modal and show feedback
+      // 5. Close modal and show feedback
       setInterventionModalOpen(false);
-      setSuccessToast(`Emergency mandate dispatched successfully for ticket ${selectedEscalation.ticketNumber || complaintId}. Specialist crew deployed.`);
-      setTimeout(() => setSuccessToast(''), 6000);
+      setSuccessToast(`Emergency mandate dispatched successfully for ticket ${selectedEscalation.ticketNumber || complaintId}. Case moved to Resolved Mandates.`);
+      setTimeout(() => setSuccessToast(''), 7000);
     } catch (err) {
       console.error('Intervention dispatch failed:', err);
       setDispatchError(err?.message || 'Failed to dispatch emergency order. Please try again.');
@@ -181,7 +216,7 @@ export const Escalations = () => {
     }
   };
 
-  const columns = [
+  const activeColumns = [
     {
       header: 'Complaint ID',
       accessor: 'id',
@@ -266,12 +301,92 @@ export const Escalations = () => {
     },
   ];
 
+  const resolvedColumns = [
+    {
+      header: 'Complaint ID',
+      accessor: 'ticketNumber',
+      sortable: true,
+      className: 'font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap',
+      render: (row) => (
+        <div>
+          <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
+            {row.ticketNumber || row.id?.slice(0, 8)}
+          </span>
+          <span className="block text-[10px] text-slate-400 font-normal font-mono truncate max-w-[120px]">
+            {row.id}
+          </span>
+        </div>
+      )
+    },
+    {
+      header: 'Grievance & Location',
+      accessor: 'title',
+      sortable: true,
+      render: (row) => (
+        <div>
+          <span className="font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">
+            {row.title}
+          </span>
+          <span className="text-[11px] text-slate-500 line-clamp-1">{row.location}</span>
+        </div>
+      ),
+    },
+    {
+      header: 'Department',
+      accessor: 'department',
+      sortable: true,
+      className: 'whitespace-nowrap',
+    },
+    {
+      header: 'Status',
+      accessor: 'status',
+      render: () => (
+        <span className="px-2.5 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1.5 bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+          <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+          Mandate Dispatched
+        </span>
+      )
+    },
+    {
+      header: 'Executive Directive',
+      accessor: 'resolutionNotes',
+      render: (row) => (
+        <span className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 max-w-[280px]">
+          {row.resolutionNotes}
+        </span>
+      )
+    },
+    {
+      header: 'Dispatched Date',
+      accessor: 'resolvedAt',
+      sortable: true,
+      render: (row) => (
+        <span className="text-xs text-slate-500 whitespace-nowrap">
+          {formatDateTime(row.resolvedAt)}
+        </span>
+      )
+    },
+    {
+      header: 'Audit',
+      render: (row) => (
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={Eye}
+          onClick={() => navigate('/admin/complaints')}
+        >
+          View Ticket
+        </Button>
+      )
+    }
+  ];
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Municipal SLA Escalation Command"
         description="Monitor grievances exceeding statutory turnaround times or contested by citizen disputes."
-        tag={`${escalatedComplaints.length} Escalated Cases`}
+        tag={`${activeEscalatedComplaints.length} Escalated Cases`}
         action={
           <Button
             variant="outline"
@@ -290,18 +405,31 @@ export const Escalations = () => {
 
       {/* Success Notification Toast */}
       {successToast && (
-        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-3 animate-fade-in shadow-sm">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
-          <span className="font-semibold">{successToast}</span>
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-sm text-emerald-800 dark:text-emerald-200 flex items-center justify-between gap-3 animate-fade-in shadow-sm">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span className="font-semibold">{successToast}</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setViewTab('RESOLVED')}
+            className="border-emerald-400 text-emerald-800 dark:text-emerald-200 hover:bg-emerald-100"
+          >
+            View in Resolved Archive &rarr;
+          </Button>
         </div>
       )}
 
       {/* Tier Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div
-          onClick={() => setLevelFilter(levelFilter === '1' ? '' : '1')}
+          onClick={() => {
+            setViewTab('ACTIVE');
+            setLevelFilter(levelFilter === '1' ? '' : '1');
+          }}
           className={`gov-card p-4 cursor-pointer transition-all border-l-4 border-l-amber-500 ${
-            levelFilter === '1' ? 'ring-2 ring-amber-500' : ''
+            viewTab === 'ACTIVE' && levelFilter === '1' ? 'ring-2 ring-amber-500' : ''
           }`}
         >
           <div className="flex justify-between items-center">
@@ -309,16 +437,19 @@ export const Escalations = () => {
               Level 1 Escalation
             </span>
             <span className="text-xl font-bold">
-              {escalatedComplaints.filter((c) => c.escalationLevel === 1).length}
+              {activeEscalatedComplaints.filter((c) => c.escalationLevel === 1).length}
             </span>
           </div>
           <span className="text-[11px] text-slate-500 mt-1 block">Department Officer Direct Review</span>
         </div>
 
         <div
-          onClick={() => setLevelFilter(levelFilter === '2' ? '' : '2')}
+          onClick={() => {
+            setViewTab('ACTIVE');
+            setLevelFilter(levelFilter === '2' ? '' : '2');
+          }}
           className={`gov-card p-4 cursor-pointer transition-all border-l-4 border-l-orange-500 ${
-            levelFilter === '2' ? 'ring-2 ring-orange-500' : ''
+            viewTab === 'ACTIVE' && levelFilter === '2' ? 'ring-2 ring-orange-500' : ''
           }`}
         >
           <div className="flex justify-between items-center">
@@ -326,16 +457,19 @@ export const Escalations = () => {
               Level 2 Escalation
             </span>
             <span className="text-xl font-bold">
-              {escalatedComplaints.filter((c) => c.escalationLevel === 2).length}
+              {activeEscalatedComplaints.filter((c) => c.escalationLevel === 2).length}
             </span>
           </div>
           <span className="text-[11px] text-slate-500 mt-1 block">Department Supervisor Intervention</span>
         </div>
 
         <div
-          onClick={() => setLevelFilter(levelFilter === '3' ? '' : '3')}
+          onClick={() => {
+            setViewTab('ACTIVE');
+            setLevelFilter(levelFilter === '3' ? '' : '3');
+          }}
           className={`gov-card p-4 cursor-pointer transition-all border-l-4 border-l-rose-500 ${
-            levelFilter === '3' ? 'ring-2 ring-rose-500' : ''
+            viewTab === 'ACTIVE' && levelFilter === '3' ? 'ring-2 ring-rose-500' : ''
           }`}
         >
           <div className="flex justify-between items-center">
@@ -343,20 +477,56 @@ export const Escalations = () => {
               Level 3 Critical
             </span>
             <span className="text-xl font-bold text-rose-600">
-              {escalatedComplaints.filter((c) => c.escalationLevel === 3).length}
+              {activeEscalatedComplaints.filter((c) => c.escalationLevel === 3).length}
             </span>
           </div>
           <span className="text-[11px] text-slate-500 mt-1 block">Municipal Administrator Mandate</span>
         </div>
       </div>
 
-      {/* Table */}
-      <DataTable
-        columns={columns}
-        data={filtered}
-        emptyTitle="No escalated complaints"
-        emptyDescription="All civic complaints are currently progressing within acceptable statutory SLA deadlines."
-      />
+      {/* View Mode Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+        <button
+          onClick={() => setViewTab('ACTIVE')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${
+            viewTab === 'ACTIVE'
+              ? 'bg-rose-500 text-white shadow-sm'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+          }`}
+        >
+          <AlertOctagon className="w-3.5 h-3.5" />
+          Active Critical Escalations ({activeEscalatedComplaints.length})
+        </button>
+
+        <button
+          onClick={() => setViewTab('RESOLVED')}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors flex items-center gap-2 ${
+            viewTab === 'RESOLVED'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+          }`}
+        >
+          <FileCheck2 className="w-3.5 h-3.5" />
+          Resolved Mandates Archive ({resolvedEscalations.length})
+        </button>
+      </div>
+
+      {/* Table view based on tab */}
+      {viewTab === 'ACTIVE' ? (
+        <DataTable
+          columns={activeColumns}
+          data={filteredActive}
+          emptyTitle="No active escalated complaints"
+          emptyDescription="All civic complaints are currently progressing within acceptable statutory SLA deadlines."
+        />
+      ) : (
+        <DataTable
+          columns={resolvedColumns}
+          data={resolvedEscalations}
+          emptyTitle="No resolved mandates yet"
+          emptyDescription="Resolved executive orders and emergency interventions will appear in this audit archive."
+        />
+      )}
 
       {/* Admin Executive Intervention Modal */}
       <Modal

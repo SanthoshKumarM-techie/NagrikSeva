@@ -9,14 +9,18 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
-  X
+  X,
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
 import { useComplaints } from '../../context/ComplaintContext';
+import { useAuth } from '../../context/AuthContext';
 import { COMPLAINT_STATUS, PRIORITIES, CATEGORIES } from '../../utils/constants';
 import PageHeader from '../../components/layout/PageHeader';
 import DataTable from '../../components/common/DataTable';
 import SearchBar from '../../components/common/SearchBar';
 import Select from '../../components/common/Select';
+import Input from '../../components/common/Input';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
@@ -25,7 +29,8 @@ import ComplaintTimeline from '../../components/dashboard/ComplaintTimeline';
 import { formatDate, formatDateTime } from '../../utils/statusHelpers';
 
 export const AllComplaints = () => {
-  const { complaints, departments } = useComplaints();
+  const { complaints, departments, transferDepartment } = useComplaints();
+  const { currentUser } = useAuth();
 
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -36,6 +41,12 @@ export const AllComplaints = () => {
   const pageSize = 10;
 
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [transferTargetDept, setTransferTargetDept] = useState('');
+  const [transferReason, setTransferReason] = useState('');
+  const [isTransferring, setIsTransferring] = useState(false);
+  const [transferError, setTransferError] = useState('');
+  const [successToast, setSuccessToast] = useState('');
 
   const filtered = useMemo(() => {
     return complaints.filter((c) => {
@@ -60,12 +71,67 @@ export const AllComplaints = () => {
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const paginatedData = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
+  const handleOpenTransfer = (complaint) => {
+    setSelectedComplaint(complaint);
+    // Suggest first department that is different from current
+    const otherDept = departments.find(d => d.id !== complaint.departmentId && d.name !== complaint.department);
+    setTransferTargetDept(otherDept?.id || '');
+    setTransferReason('');
+    setTransferError('');
+    setTransferModalOpen(true);
+  };
+
+  const handleTransferSubmit = async () => {
+    if (!selectedComplaint) return;
+    if (!transferTargetDept) {
+      setTransferError('Please select a destination department.');
+      return;
+    }
+    if (!transferReason || transferReason.trim().length < 3) {
+      setTransferError('Please provide a specific transfer reason (min 3 characters).');
+      return;
+    }
+
+    setIsTransferring(true);
+    setTransferError('');
+
+    try {
+      const targetDeptObj = departments.find(d => d.id === transferTargetDept);
+      await transferDepartment(
+        selectedComplaint.id,
+        transferTargetDept,
+        `SUPERVISOR DIRECT TRANSFER: ${transferReason.trim()}`,
+        currentUser || { name: 'Super Admin', role: 'SUPER_ADMIN' }
+      );
+
+      setSuccessToast(`Ticket ${selectedComplaint.ticketNumber || selectedComplaint.id} successfully reallocated to ${targetDeptObj?.name || 'new department'}.`);
+      setTimeout(() => setSuccessToast(''), 6000);
+      setTransferModalOpen(false);
+      setSelectedComplaint(null);
+    } catch (err) {
+      console.error('Transfer error:', err);
+      setTransferError(err?.message || 'Failed to transfer complaint. Please try again.');
+    } finally {
+      setIsTransferring(false);
+    }
+  };
+
   const columns = [
     {
       header: 'Complaint ID',
       accessor: 'id',
       sortable: true,
       className: 'font-mono font-bold text-blue-600 dark:text-blue-400 whitespace-nowrap',
+      render: (row) => (
+        <div>
+          <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+            {row.ticketNumber || row.id?.slice(0, 8)}
+          </span>
+          <span className="block text-[10px] text-slate-400 font-normal font-mono truncate max-w-[120px]">
+            {row.id}
+          </span>
+        </div>
+      )
     },
     {
       header: 'Title & Location',
@@ -99,52 +165,46 @@ export const AllComplaints = () => {
       render: (row) => <Badge status={row.status} size="sm" />,
     },
     {
-      header: 'Citizen',
-      accessor: 'citizenName',
-      sortable: true,
+      header: 'Assigned Crew',
+      accessor: 'assignedWorkerName',
       render: (row) => (
-        <span className="text-xs whitespace-nowrap">{row.citizenName}</span>
-      ),
+        <span className="text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap">
+          {row.assignedWorkerName || 'Unassigned'}
+        </span>
+      )
     },
     {
-      header: 'SLA Deadline',
-      accessor: 'slaDeadline',
+      header: 'Logged Date',
+      accessor: 'submittedAt',
       sortable: true,
-      render: (row) => {
-        const isOverdue = new Date(row.slaDeadline) < new Date();
-        return (
-          <span className={`text-xs whitespace-nowrap ${isOverdue ? 'text-rose-600 font-bold' : 'text-slate-500'}`}>
-            {formatDate(row.slaDeadline)}
-          </span>
-        );
-      },
-    },
-    {
-      header: 'Escalation',
       render: (row) => (
-        row.escalation ? (
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300">
-            L{row.escalation.level} ({row.escalation.title})
-          </span>
-        ) : (
-          <span className="text-[11px] text-slate-400">Normal</span>
-        )
+        <span className="text-xs text-slate-500 whitespace-nowrap">
+          {formatDate(row.submittedAt)}
+        </span>
       ),
     },
     {
       header: 'Action',
       render: (row) => (
-        <Button
-          size="sm"
-          variant="secondary"
-          icon={Eye}
-          onClick={(e) => {
-            e.stopPropagation();
-            setSelectedComplaint(row);
-          }}
-        >
-          Audit
-        </Button>
+        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            icon={Eye}
+            onClick={() => setSelectedComplaint(row)}
+          >
+            Audit
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            icon={ArrowRightLeft}
+            onClick={() => handleOpenTransfer(row)}
+            title="Reassign or transfer to another department"
+          >
+            Transfer
+          </Button>
+        </div>
       ),
     },
   ];
@@ -152,95 +212,118 @@ export const AllComplaints = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Municipal Grievance Master Ledger"
-        description="Comprehensive audit of all citizen complaints across all municipal departments."
-        tag={`${filtered.length} Total Registered`}
+        title="Central Grievance Audit & Registry"
+        description="Comprehensive master ledger of all citizen grievances, jurisdictional allocations, and resolution lifecycles."
+        tag={`${complaints.length} Total Registered`}
       />
 
-      {/* Filter Toolbar */}
-      <div className="gov-card p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <SearchBar
-            value={search}
-            onChange={(val) => {
-              setSearch(val);
-              setCurrentPage(1);
-            }}
-            placeholder="Search by ID, citizen, road..."
-          />
+      {/* Success Notification Banner */}
+      {successToast && (
+        <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-3 animate-fade-in shadow-sm">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+          <span className="font-semibold">{successToast}</span>
+        </div>
+      )}
 
+      {/* Search & Multi-Filter Control Strip */}
+      <div className="gov-card p-4 space-y-3">
+        <SearchBar
+          value={search}
+          onChange={(val) => {
+            setSearch(val);
+            setCurrentPage(1);
+          }}
+          placeholder="Search by ID, ticket number, grievance keyword, citizen name or location..."
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <Select
+            label="Department"
             value={deptFilter}
             onChange={(e) => {
               setDeptFilter(e.target.value);
               setCurrentPage(1);
             }}
-            options={departments.map((d) => d.name)}
+            options={departments.map((d) => ({ value: d.name, label: d.name }))}
             placeholder="All Departments"
           />
 
           <Select
+            label="Category"
             value={categoryFilter}
             onChange={(e) => {
               setCategoryFilter(e.target.value);
               setCurrentPage(1);
             }}
-            options={CATEGORIES}
+            options={CATEGORIES.map((c) => ({ value: c.name, label: c.name }))}
             placeholder="All Categories"
           />
 
           <Select
+            label="Status"
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
               setCurrentPage(1);
             }}
-            options={Object.values(COMPLAINT_STATUS)}
+            options={Object.values(COMPLAINT_STATUS).map((s) => ({ value: s, label: s }))}
             placeholder="All Statuses"
           />
 
           <Select
+            label="Priority"
             value={priorityFilter}
             onChange={(e) => {
               setPriorityFilter(e.target.value);
               setCurrentPage(1);
             }}
-            options={Object.values(PRIORITIES)}
+            options={Object.values(PRIORITIES).map((p) => ({ value: p, label: p }))}
             placeholder="All Priorities"
           />
         </div>
       </div>
 
-      {/* Table & Pagination */}
-      <div className="space-y-2">
+      {/* Complaints Ledger Table */}
+      <div className="space-y-4">
         <DataTable
           columns={columns}
           data={paginatedData}
-          onRowClick={(row) => setSelectedComplaint(row)}
           emptyTitle="No records found"
-          emptyDescription="No civic complaints match the configured filters."
+          emptyDescription="No civic complaints match the selected filter criteria."
         />
 
         <Pagination
           currentPage={currentPage}
           totalPages={totalPages}
-          totalItems={filtered.length}
-          pageSize={pageSize}
           onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
         />
       </div>
 
-      {/* Admin Audit Modal */}
+      {/* Admin Audit Dossier Modal */}
       {selectedComplaint && (
         <Modal
           isOpen={!!selectedComplaint}
           onClose={() => setSelectedComplaint(null)}
-          title={`Audit Dossier: ${selectedComplaint.id}`}
+          title={`Audit Dossier: ${selectedComplaint.ticketNumber || selectedComplaint.id}`}
           size="lg"
           footer={
-            <Button variant="secondary" onClick={() => setSelectedComplaint(null)}>
-              Close
-            </Button>
+            <div className="flex items-center justify-between w-full">
+              <Button
+                variant="outline"
+                icon={ArrowRightLeft}
+                onClick={() => {
+                  const comp = selectedComplaint;
+                  handleOpenTransfer(comp);
+                }}
+              >
+                Reassign Department
+              </Button>
+              <Button variant="secondary" onClick={() => setSelectedComplaint(null)}>
+                Close
+              </Button>
+            </div>
           }
         >
           <div className="space-y-4">
@@ -270,15 +353,17 @@ export const AllComplaints = () => {
               </div>
               <div>
                 <span className="text-slate-400 block">Location:</span>
-                <span>{selectedComplaint.location} ({selectedComplaint.ward})</span>
+                <span>{selectedComplaint.location} ({selectedComplaint.ward || 'Central Ward'})</span>
               </div>
               <div>
                 <span className="text-slate-400 block">Complainant:</span>
-                <span>{selectedComplaint.citizenName} ({selectedComplaint.citizenPhone})</span>
+                <span>{selectedComplaint.citizenName || 'Registered Citizen'} ({selectedComplaint.citizenPhone || 'Contact on file'})</span>
               </div>
               <div>
                 <span className="text-slate-400 block">Assigned Crew:</span>
-                <span>{selectedComplaint.assignedWorkerName || 'None'}</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">
+                  {selectedComplaint.assignedWorkerName || 'Unassigned'}
+                </span>
               </div>
             </div>
 
@@ -287,9 +372,9 @@ export const AllComplaints = () => {
                 <strong className="text-purple-700 dark:text-purple-300 block mb-1">
                   Transfer History ({selectedComplaint.transfers.length} events):
                 </strong>
-                {selectedComplaint.transfers.map((tr) => (
-                  <p key={tr.id} className="text-[11px] text-slate-600 dark:text-slate-300">
-                    {tr.fromDepartmentName} &rarr; {tr.toDepartmentName} ({formatDate(tr.timestamp)}): "{tr.reason}"
+                {selectedComplaint.transfers.map((tr, idx) => (
+                  <p key={tr.id || idx} className="text-[11px] text-slate-600 dark:text-slate-300">
+                    {tr.fromDepartmentName || 'Origin'} &rarr; {tr.toDepartmentName || 'Destination'} ({formatDate(tr.timestamp)}): "{tr.reason}"
                   </p>
                 ))}
               </div>
@@ -304,9 +389,70 @@ export const AllComplaints = () => {
           </div>
         </Modal>
       )}
+
+      {/* Admin Department Transfer / Reallocation Modal */}
+      <Modal
+        isOpen={transferModalOpen}
+        onClose={() => !isTransferring && setTransferModalOpen(false)}
+        title={`Reallocate Department: ${selectedComplaint?.ticketNumber || selectedComplaint?.id}`}
+        description="Reassign this civic complaint to another municipal wing with statutory reason and timeline recording."
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => setTransferModalOpen(false)}
+              disabled={isTransferring}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              icon={ArrowRightLeft}
+              onClick={handleTransferSubmit}
+              disabled={isTransferring}
+            >
+              {isTransferring ? 'Reallocating...' : 'Confirm Transfer'}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {transferError && (
+            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+              <span>{transferError}</span>
+            </div>
+          )}
+
+          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-xs text-blue-800 dark:text-blue-300">
+            <strong>Current Department:</strong> {selectedComplaint?.department}
+          </div>
+
+          <Select
+            label="Destination Municipal Department"
+            value={transferTargetDept}
+            onChange={(e) => setTransferTargetDept(e.target.value)}
+            options={departments
+              .filter(d => d.id !== selectedComplaint?.departmentId && d.name !== selectedComplaint?.department)
+              .map(d => ({ value: d.id, label: `${d.name} (${d.code || 'WING'})` }))}
+            disabled={isTransferring}
+            required
+          />
+
+          <Input
+            label="Administrative Justification & Reassignment Directives"
+            type="textarea"
+            rows={3}
+            placeholder="Explain jurisdictional reallocation reason (e.g., issue falls under BWSSB water authority scope)..."
+            value={transferReason}
+            onChange={(e) => setTransferReason(e.target.value)}
+            disabled={isTransferring}
+            required
+          />
+        </div>
+      </Modal>
     </div>
   );
 };
 
 export default AllComplaints;
-
