@@ -169,15 +169,12 @@ export const WorkerDashboard = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
-                FIELD TELEMETRY
-              </span>
               <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                Active Crew Dispatch & Incident Corridor Radar
+                Assigned Work Locations & Routes
               </h3>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Live Uber-style route navigation to citizen-reported grievance spots across your operational ward.
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Google Maps driving directions and location previews for your assigned field work orders.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -201,7 +198,7 @@ export const WorkerDashboard = () => {
             <div className="gov-card p-4 flex flex-col justify-between space-y-3">
               <div>
                 <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-2">
-                  Select Incident Corridor
+                  Assigned Work Orders
                 </h4>
                 <div className="space-y-2 max-h-[310px] overflow-y-auto pr-1">
                   {workerTasks.map((t) => {
@@ -241,7 +238,7 @@ export const WorkerDashboard = () => {
                 className="w-full"
                 onClick={() => navigate(`/worker/tasks/${(selectedTask || workerTasks[0])?.complaintId || (selectedTask || workerTasks[0])?.id}`)}
               >
-                Inspect Work Order Route
+                View Work Order Details
               </Button>
             </div>
           </div>

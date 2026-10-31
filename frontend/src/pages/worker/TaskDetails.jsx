@@ -336,24 +336,8 @@ export const TaskDetails = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Job Details & Evidence Submission Form */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Contractor & Crew Turn-by-Turn GPS Dispatch Map (Uber / Red Taxi style) */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
-                  LIVE GPS NAVIGATION
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                  Contractor & Crew Dispatch Route
-                </h3>
-              </div>
-              <span className="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Citizen Geo-Pin Locked &bull; Turn-by-Turn Corridor</span>
-              </span>
-            </div>
-            <ContractorDispatchMap task={task} />
-          </div>
+          {/* Site Route & Google Maps Preview */}
+          <ContractorDispatchMap task={task} />
 
           {/* Work Order Info */}
           <div className="gov-card p-6 space-y-4">
