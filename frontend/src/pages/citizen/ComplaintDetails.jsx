@@ -16,7 +16,8 @@ import {
   Image as ImageIcon,
   Check,
   Navigation,
-  LocateFixed
+  LocateFixed,
+  Star
 } from 'lucide-react';
 import { useComplaints } from '../../context/ComplaintContext';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +27,7 @@ import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
+import CitizenFeedbackModal from '../../components/common/CitizenFeedbackModal';
 import Input from '../../components/common/Input';
 import ComplaintTimeline from '../../components/dashboard/ComplaintTimeline';
 import ComplaintProgressTracker from '../../components/dashboard/ComplaintProgressTracker';
@@ -132,25 +134,45 @@ export const ComplaintDetails = () => {
     addSupporter(complaint.id, currentUser);
   };
 
-  const handleConfirmClick = async () => {
-    setBackendComplaint(prev => prev ? {
-      ...prev,
-      status: COMPLAINT_STATUS.CLOSED,
-      current_status: 'CLOSED',
-      timeline: [
-        ...(prev.timeline || []),
-        {
-          id: `tl-${Date.now()}`,
-          status: COMPLAINT_STATUS.CLOSED,
-          title: `Resolution Approved by ${isAuthor ? 'Raising Citizen' : 'Community Supporter'} — Case Closed`,
-          description: `${currentUser?.name || 'Citizen'} verified civic restoration on-site and approved final ticket closure.`,
-          timestamp: new Date().toISOString(),
-          author: currentUser?.name || 'Citizen',
-          role: 'Citizen'
-        }
-      ]
-    } : null);
-    await citizenConfirmResolution(complaint.id, currentUser);
+  const [confirmLoading, setConfirmLoading] = useState(false);
+
+  const handleConfirmSubmit = async ({ rating = 5, feedback = '' } = {}) => {
+    setConfirmLoading(true);
+    try {
+      const citizenRating = Number(rating) || 5;
+      const citizenFeedback = feedback.trim() || 'Resolution confirmed by citizen.';
+
+      setBackendComplaint(prev => prev ? {
+        ...prev,
+        status: COMPLAINT_STATUS.CLOSED,
+        current_status: 'CLOSED',
+        citizenRating,
+        citizenFeedback,
+        timeline: [
+          ...(prev.timeline || []),
+          {
+            id: `tl-${Date.now()}`,
+            status: COMPLAINT_STATUS.CLOSED,
+            title: 'Citizen Confirmed Resolution — Case Closed',
+            description: `${currentUser?.name || 'Citizen'} verified civic restoration (Rated: ${citizenRating}/5 ⭐). ${citizenFeedback ? `Feedback: "${citizenFeedback}"` : ''}`.trim(),
+            timestamp: new Date().toISOString(),
+            author: currentUser?.name || 'Citizen',
+            role: 'Citizen'
+          }
+        ]
+      } : null);
+
+      await citizenConfirmResolution(complaint.id, currentUser, null, { rating: citizenRating, feedback: citizenFeedback });
+      setConfirmModalOpen(false);
+    } catch (err) {
+      console.error('Error confirming resolution with feedback:', err);
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
+  const handleConfirmClick = () => {
+    setConfirmModalOpen(true);
   };
 
   const handleDisputeSubmit = async () => {
@@ -413,6 +435,36 @@ export const ComplaintDetails = () => {
             </div>
           )}
 
+          {/* Citizen Verification & Rating Display Card */}
+          {(complaint.citizenRating || complaint.citizenFeedback) && (
+            <div className="gov-card p-5 border-l-4 border-l-emerald-500 bg-emerald-50/20 dark:bg-emerald-950/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  Citizen Verification & Feedback
+                </span>
+                {complaint.citizenRating && (
+                  <div className="flex items-center gap-1 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`w-3.5 h-3.5 ${s <= complaint.citizenRating ? 'fill-amber-400 text-amber-400' : 'text-slate-300 dark:text-slate-600'}`}
+                      />
+                    ))}
+                    <span className="text-xs font-bold text-amber-800 dark:text-amber-300 ml-1">
+                      {complaint.citizenRating}/5
+                    </span>
+                  </div>
+                )}
+              </div>
+              {complaint.citizenFeedback && (
+                <p className="text-xs text-slate-700 dark:text-slate-300 italic pl-1">
+                  "{complaint.citizenFeedback}"
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Citizen Evidence Gallery */}
           <div className="gov-card p-5">
             <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-3">
@@ -553,19 +605,13 @@ export const ComplaintDetails = () => {
         </div>
       </Modal>
 
-      {/* Email Deep Link Confirmation Dialog */}
-      <ConfirmDialog
+      {/* Citizen Resolution & Rating Feedback Modal */}
+      <CitizenFeedbackModal
         isOpen={confirmModalOpen}
         onClose={() => setConfirmModalOpen(false)}
-        onConfirm={async () => {
-          setConfirmModalOpen(false);
-          await handleConfirmClick();
-        }}
-        title="Confirm Remediation & Close Case"
-        message={`Are you satisfied with the restoration work performed for #${complaint?.ticketNumber || complaint?.id}? Confirming will formally close this grievance ticket.`}
-        confirmText="Yes, Confirm & Close Case"
-        cancelText="Inspect Details First"
-        type="success"
+        onConfirm={handleConfirmSubmit}
+        complaint={complaint}
+        loading={confirmLoading}
       />
 
       {/* Photo Zoom Modal */}
