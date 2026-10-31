@@ -20,7 +20,7 @@ export const findNearbyMatches = async ({ latitude, longitude, categoryId, radiu
 };
 
 export const createComplaint = async (citizenId, data, clientInfo = {}) => {
-  const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val);
+  const isUuid = (val) => typeof val === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
   // Check category
   let category = null;
@@ -110,37 +110,39 @@ export const createComplaint = async (citizenId, data, clientInfo = {}) => {
     // 4. Add citizen as supporter
     await complaintRepository.addSupporter(complaint.id, citizenId, client);
 
-    // 5. Send notification to citizen
-    notificationService.notifyUser({
-      userId: citizenId,
-      complaintId: complaint.id,
-      title: 'Complaint Registered',
-      message: `Your complaint #${complaint.ticket_number} has been registered successfully. SLA target: ${slaHours} hours.`,
-      notificationType: 'COMPLAINT_REGISTERED'
-    }).catch(console.error);
-
-    // 6. Send notification to department officers
-    notificationService.notifyDepartmentOfficers({
-      departmentId: complaint.department_id,
-      complaintId: complaint.id,
-      title: 'New Complaint Received',
-      message: `New complaint #${complaint.ticket_number} registered in category: ${category.name}`,
-      notificationType: 'COMPLAINT_REGISTERED'
-    }).catch(console.error);
-
-    // 7. Audit log
-    auditService.logEvent({
-      userId: citizenId,
-      action: 'CREATE_COMPLAINT',
-      entityType: 'COMPLAINT',
-      entityId: complaint.id,
-      details: { ticketNumber: complaint.ticket_number, categoryId: data.categoryId, priority: data.priority },
-      ipAddress: clientInfo.ip,
-      userAgent: clientInfo.userAgent
-    }).catch(console.error);
-
     return complaint;
   });
+
+  // 5. Send notification to citizen (post-commit to guarantee FK resolution)
+  notificationService.notifyUser({
+    userId: citizenId,
+    complaintId: complaint.id,
+    title: 'Complaint Registered',
+    message: `Your complaint #${complaint.ticket_number} has been registered successfully. SLA target: ${slaHours} hours.`,
+    notificationType: 'COMPLAINT_REGISTERED'
+  }).catch(console.error);
+
+  // 6. Send notification to department officers (post-commit)
+  notificationService.notifyDepartmentOfficers({
+    departmentId: complaint.department_id,
+    complaintId: complaint.id,
+    title: 'New Complaint Received',
+    message: `New complaint #${complaint.ticket_number} registered in category: ${category.name}`,
+    notificationType: 'COMPLAINT_REGISTERED'
+  }).catch(console.error);
+
+  // 7. Audit log (post-commit)
+  auditService.logEvent({
+    userId: citizenId,
+    action: 'CREATE_COMPLAINT',
+    entityType: 'COMPLAINT',
+    entityId: complaint.id,
+    details: { ticketNumber: complaint.ticket_number, categoryId: data.categoryId, priority: data.priority },
+    ipAddress: clientInfo.ip,
+    userAgent: clientInfo.userAgent
+  }).catch(console.error);
+
+  return complaint;
 };
 
 export const supportComplaint = async (complaintId, citizenId, clientInfo = {}) => {

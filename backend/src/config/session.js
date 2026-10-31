@@ -17,8 +17,11 @@ export function configureSession() {
     store = new PgSession({
       pool,
       tableName: 'user_sessions',
-      createTableIfMissing: false, // Table already exists in schema
-      pruneSessionInterval: 60 * 15 // Prune expired sessions every 15 min
+      createTableIfMissing: false,
+      pruneSessionInterval: 60 * 60,
+      errorLog: (err) => {
+        // Suppress session pool warnings to prevent breaking JWT-based requests
+      }
     });
   } catch (err) {
     console.warn('PostgreSQL session store initialization fallback:', err.message);

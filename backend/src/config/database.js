@@ -48,7 +48,7 @@ export function getPool() {
 
     pool = new Pool({
       ...poolConfig,
-      max: 10,
+      max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 15000,
       keepAlive: true,

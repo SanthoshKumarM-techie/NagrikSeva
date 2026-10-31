@@ -22,7 +22,7 @@ export const assignWorker = async (officerUser, { complaintId, workerId, priorit
   }
 
   let worker = null;
-  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workerId);
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(workerId);
   if (isUuid) {
     worker = await userRepository.findById(workerId);
   } else {
