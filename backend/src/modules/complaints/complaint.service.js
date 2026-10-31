@@ -294,7 +294,15 @@ export const cancelComplaint = async (id, citizenId, remarks, clientInfo = {}) =
 };
 
 export const getCitizenStats = async (citizenId) => {
-  return await complaintRepository.getCitizenStats(citizenId);
+  const raw = await complaintRepository.getCitizenStats(citizenId);
+  return {
+    ...raw,
+    totalComplaints: raw?.total_filed || 0,
+    pendingCount: raw?.active_count || 0,
+    inProgressCount: raw?.active_count || 0,
+    resolvedCount: raw?.resolved_count || 0,
+    supportedCount: raw?.supported_count || 0
+  };
 };
 
 export const getDepartmentStats = async (departmentId) => {

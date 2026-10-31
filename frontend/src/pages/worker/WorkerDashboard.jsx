@@ -103,7 +103,7 @@ export const WorkerDashboard = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Field Crew Operations &mdash; ${currentUser?.name || 'Suresh Patil'}`}
+        title={`Contractor & Crew Operations &mdash; ${currentUser?.name || 'Suresh Patil'}`}
         description="Daily work orders, site inspection checkpoints, and remediation evidence submissions."
         tag="Field Specialist"
         actions={

@@ -60,8 +60,8 @@ export const WorkerAssignments = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Field Crew &amp; Worker Deployments"
-        description="Monitor staff workloads, assign municipal tasks, and optimize field dispatch."
+        title="Contractor & Crew Deployments"
+        description="Monitor contractor and crew workloads, assign municipal tasks, and optimize dispatch."
         tag="Operations"
         actions={
           <div className="flex items-center gap-2">

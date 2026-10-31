@@ -7,6 +7,7 @@ import reviewsApi from '../api/reviews.api';
 import usersApi from '../api/users.api';
 import slaApi from '../api/sla.api';
 import { COMPLAINT_STATUS, PRIORITIES, STORAGE_KEYS } from '../utils/constants';
+import { INITIAL_COMPLAINTS } from '../data/mockComplaints';
 import { normalizeStatus, normalizePriority } from '../utils/statusHelpers';
 import { getImageUrl } from '../utils/imageHelpers';
 import { getStorage, setStorage } from '../utils/storage';
@@ -268,7 +269,11 @@ export const ComplaintProvider = ({ children }) => {
   const { addNotification } = useNotifications();
   const { currentUser } = useAuth();
 
-  const [complaints, setComplaints] = useState(() => getStorage(STORAGE_KEYS.COMPLAINTS, []));
+  const [complaints, setComplaints] = useState(() => {
+    const cached = getStorage(STORAGE_KEYS.COMPLAINTS, null);
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    return INITIAL_COMPLAINTS;
+  });
   const [departments, setDepartments] = useState(() => getStorage(STORAGE_KEYS.DEPARTMENTS, FALLBACK_DEPARTMENTS));
   const [categories, setCategories] = useState(() => getStorage('nagrikseva_categories', FALLBACK_CATEGORIES));
   const [wards, setWards] = useState(() => getStorage('nagrikseva_wards', FALLBACK_WARDS));
@@ -323,10 +328,12 @@ export const ComplaintProvider = ({ children }) => {
     try {
       setLoading(true);
 
-      const [deptsRes, catsRes, wardsRes] = await Promise.allSettled([
+      // Fast parallel fetch of lookups and complaints simultaneously to remove sequential delays
+      const [deptsRes, catsRes, wardsRes, complaintsRes] = await Promise.allSettled([
         lookupsApi.getDepartments(),
         lookupsApi.getCategories(),
-        lookupsApi.getWards()
+        lookupsApi.getWards(),
+        complaintsApi.getComplaints({ limit: 100 })
       ]);
 
       if (deptsRes.status === 'fulfilled' && deptsRes.value) {
@@ -357,10 +364,8 @@ export const ComplaintProvider = ({ children }) => {
         setWards(wardsRes.value);
       }
 
-      // Fetch complaints
-      const complaintsRes = await complaintsApi.getComplaints({ limit: 100 });
-      if (complaintsRes) {
-        const mapped = complaintsRes.map(mapBackendComplaint);
+      if (complaintsRes.status === 'fulfilled' && complaintsRes.value) {
+        const mapped = complaintsRes.value.map(mapBackendComplaint);
         setComplaints(mapped);
       }
 
@@ -1343,7 +1348,7 @@ export const ComplaintProvider = ({ children }) => {
         password: userData.password || 'officer123',
         fullName: userData.name,
         phone: userData.phone,
-        role: userData.role === 'Citizen' ? 'CITIZEN' : userData.role === 'Department Officer' ? 'DEPARTMENT_OFFICER' : userData.role === 'Field Worker' ? 'FIELD_WORKER' : 'SUPER_ADMIN',
+        role: userData.role === 'Citizen' ? 'CITIZEN' : userData.role === 'Department Officer' ? 'DEPARTMENT_OFFICER' : (userData.role === 'Field Worker' || userData.role === 'Contractor & Crew Operations' || userData.role === ROLES.WORKER) ? 'FIELD_WORKER' : 'SUPER_ADMIN',
         departmentId: resolvedDeptId
       });
       if (created) {

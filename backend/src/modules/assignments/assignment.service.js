@@ -31,7 +31,7 @@ export const assignWorker = async (officerUser, { complaintId, workerId, priorit
   }
 
   if (!worker || worker.role !== 'FIELD_WORKER') {
-    throw ApiError.badRequest('Selected user is not a valid field worker');
+    throw ApiError.badRequest('Selected user is not a valid contractor or crew member');
   }
 
   if (!isSuper && complaint.department_id && worker.department_id && worker.department_id !== complaint.department_id && worker.department_id !== userDeptId) {
@@ -80,8 +80,8 @@ export const assignWorker = async (officerUser, { complaintId, workerId, priorit
     notificationService.notifyUser({
       userId: complaint.citizen_id,
       complaintId: complaint.id,
-      title: 'Field Worker Assigned',
-      message: `A field worker (${worker.full_name}) has been assigned to your complaint #${complaint.ticket_number}.`,
+      title: 'Contractor & Crew Assigned',
+      message: `A contractor & crew specialist (${worker.full_name}) has been assigned to your complaint #${complaint.ticket_number}.`,
       notificationType: 'STATUS_UPDATED'
     }).catch(console.error);
 
@@ -200,7 +200,7 @@ export const logInspection = async (assignmentId, workerId, data, clientInfo = {
       userId: assignment.citizen_id,
       complaintId: assignment.complaint_id,
       title: 'Site Inspection Completed',
-      message: `A field worker has inspected the site for #${assignment.ticket_number}. Remediation planning is underway.`,
+      message: `A contractor & crew specialist has inspected the site for #${assignment.ticket_number}. Remediation planning is underway.`,
       notificationType: 'STATUS_UPDATED'
     }).catch(console.error);
 
@@ -367,7 +367,7 @@ export const completeWork = async (assignmentId, workerId, data, clientInfo = {}
       fromStatus: assignment.complaint_status,
       toStatus: 'VERIFICATION',
       changedBy: workerId,
-      remarks: `Work completed by field worker: ${data.description}. Evidence submitted for officer verification.`
+      remarks: `Work completed by contractor & crew: ${data.description}. Evidence submitted for officer verification.`
     }, client);
 
     // 6. Notify Department Officers

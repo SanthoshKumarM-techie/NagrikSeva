@@ -7,6 +7,7 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 
 import usersApi from '../../api/users.api';
+import { formatUserCode } from '../../utils/userHelpers';
 
 export const CitizenProfile = () => {
   const { currentUser, updateUserProfile } = useAuth();
@@ -90,7 +91,7 @@ export const CitizenProfile = () => {
             <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">
               {currentUser?.name || 'Aarav Sharma'}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Citizen ID: {currentUser?.id || 'CIT001'}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Citizen ID: {formatUserCode(currentUser, 'Citizen')}</p>
             <div className="inline-flex items-center gap-1 mt-2 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
               <Shield className="w-3 h-3" /> Citizen Resident
             </div>

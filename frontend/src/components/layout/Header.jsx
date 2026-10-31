@@ -54,7 +54,7 @@ export const Header = ({ onMobileMenuClick }) => {
     const roleMap = {
       citizen: 'Citizen Portal',
       officer: 'Officer Desk',
-      worker: 'Field Operations',
+      worker: 'Contractor & Crew Operations',
       admin: 'Administration',
     };
     const roleTitle = roleMap[pathParts[0]] || pathParts[0];
@@ -258,7 +258,7 @@ export const Header = ({ onMobileMenuClick }) => {
                   onClick={() => {
                     setUserMenuOpen(false);
                     logout();
-                    navigate('/login');
+                    navigate('/');
                   }}
                   className="w-full flex items-center gap-2 px-4 py-2 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-rose-600 dark:text-rose-400"
                 >
