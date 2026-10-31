@@ -1,24 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { ShieldCheck, LogIn, KeyRound, User, AlertCircle, UserPlus, Sparkles, Mail, Phone, MapPin, Briefcase, ArrowLeft, Building2, Wrench, Shield } from 'lucide-react';
+import { ShieldCheck, LogIn, KeyRound, User, AlertCircle, UserPlus, Sparkles, Mail, Phone, MapPin, Briefcase, ArrowLeft, Building2, Wrench, Shield, Lock, CheckCircle2, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { DEMO_CREDENTIALS, ROLES } from '../../utils/constants';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Select from '../../components/common/Select';
 import ThemeToggle from '../../components/layout/ThemeToggle';
+import LanguageSelector from '../../components/layout/LanguageSelector';
 import lookupsApi from '../../api/lookups.api';
 
 export const Login = () => {
-  const { login, register } = useAuth();
+  const { login, register, requestPasswordResetOtp, resetPasswordWithOtp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const portalParam = searchParams.get('portal'); // 'citizen' | 'worker' | 'officer' | 'admin'
 
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [mode, setMode] = useState('login'); // 'login' | 'register' | 'forgot'
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Forgot Password state
+  const [forgotStep, setForgotStep] = useState('request'); // 'request' | 'reset'
+  const [forgotId, setForgotId] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [forgotConfirmPass, setForgotConfirmPass] = useState('');
+  const [forgotMaskedEmail, setForgotMaskedEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   // Determine active portal context
   const activePortal = portalParam || 'citizen';
@@ -37,6 +47,15 @@ export const Login = () => {
   const [regDeptId, setRegDeptId] = useState('');
   const [regSpecialization, setRegSpecialization] = useState('Roads & Pothole Repair');
   const [departments, setDepartments] = useState([]);
+
+  // Resend cooldown timer
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   useEffect(() => {
     if (activePortal === 'worker') {
@@ -175,6 +194,76 @@ export const Login = () => {
     }
   };
 
+  const handleRequestOtp = async (e) => {
+    if (e) e.preventDefault();
+    if (!forgotId.trim()) {
+      setError('Please provide your Email or Official User ID.');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await requestPasswordResetOtp(forgotId.trim());
+      setLoading(false);
+      if (res.success) {
+        setForgotMaskedEmail(res.data?.maskedEmail || 'your email');
+        setForgotStep('reset');
+        setResendCooldown(60);
+        setSuccessMsg(res.data?.message || 'Verification OTP dispatched to your email.');
+      } else {
+        setError(res.error || 'Failed to dispatch verification code.');
+      }
+    } catch (err) {
+      setLoading(false);
+      setError(err?.message || 'Failed to dispatch verification code.');
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (!forgotOtp.trim() || forgotOtp.trim().length !== 6) {
+      setError('Please enter the 6-digit verification code sent to your email.');
+      return;
+    }
+    if (!forgotNewPass || forgotNewPass.length < 6) {
+      setError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (forgotNewPass !== forgotConfirmPass) {
+      setError('Passwords do not match. Please verify both fields.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+
+    try {
+      const res = await resetPasswordWithOtp({
+        identifier: forgotId.trim(),
+        otp: forgotOtp.trim(),
+        newPassword: forgotNewPass
+      });
+      setLoading(false);
+
+      if (res.success) {
+        setSuccessMsg('Password updated successfully! Please sign in with your new password.');
+        setUserId(forgotId.trim());
+        setPassword('');
+        setForgotOtp('');
+        setForgotNewPass('');
+        setForgotConfirmPass('');
+        setMode('login');
+      } else {
+        setError(res.error || 'Failed to reset password.');
+      }
+    } catch (err) {
+      setLoading(false);
+      setError(err?.message || 'Failed to reset password.');
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col justify-between bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       {/* Top bar with back to portals and logo */}
@@ -185,7 +274,10 @@ export const Login = () => {
         >
           <ArrowLeft className="w-4 h-4" /> Switch Municipal Gate
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-2.5">
+          <LanguageSelector />
+          <ThemeToggle />
+        </div>
       </div>
 
       {/* Main Box */}
@@ -206,8 +298,8 @@ export const Login = () => {
 
           {/* Form Card */}
           <div className="gov-card p-6 sm:p-8 bg-white dark:bg-slate-900 shadow-md">
-            {/* Mode Tabs if registration is allowed for this gate */}
-            {portalInfo.allowRegister && (
+            {/* Mode Tabs if registration is allowed for this gate and not in forgot password mode */}
+            {mode !== 'forgot' && portalInfo.allowRegister && (
               <div className="flex border-b border-slate-200 dark:border-slate-800 mb-5">
                 <button
                   type="button"
@@ -248,7 +340,147 @@ export const Login = () => {
               </div>
             )}
 
-            {mode === 'login' ? (
+            {mode === 'forgot' ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-xs">
+                      OTP
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-tight">
+                        Self-Service Password Recovery
+                      </h3>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        {forgotStep === 'request' ? 'Step 1 of 2: Dispatch OTP to Registered Mail' : 'Step 2 of 2: Enter OTP & Set New Password'}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
+                    className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 font-medium"
+                  >
+                    Back to Sign In
+                  </button>
+                </div>
+
+                {forgotStep === 'request' ? (
+                  <form onSubmit={handleRequestOtp} className="space-y-4">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Enter your registered <strong>Email Address</strong> or official <strong>User ID</strong> (e.g. <code>OFF001</code>, <code>WRK001</code>, <code>CIT001</code>). Department officers, field staff, and citizens can reset their password independently.
+                    </p>
+
+                    <Input
+                      label="Email or Official ID"
+                      id="forgotId"
+                      icon={User}
+                      placeholder="e.g. name@bbmp.gov.in or OFF001"
+                      value={forgotId}
+                      onChange={(e) => setForgotId(e.target.value)}
+                      required
+                    />
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      loading={loading}
+                      icon={Mail}
+                      className="w-full mt-2"
+                    >
+                      Send OTP to Registered Mail
+                    </Button>
+
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 font-semibold transition-colors"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" /> Return to Sign In
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <form onSubmit={handleResetPassword} className="space-y-3.5">
+                    <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-lg text-xs text-blue-800 dark:text-blue-300">
+                      Verification code dispatched to <strong>{forgotMaskedEmail}</strong>. Valid for 10 minutes.
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        6-Digit Verification Code (OTP)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={forgotOtp}
+                        onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
+                        placeholder="••••••"
+                        className="w-full text-center text-2xl font-mono tracking-[0.5em] font-black py-2.5 px-4 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                      <div className="flex items-center justify-between text-[11px] mt-1.5 px-0.5">
+                        <span className="text-slate-500">Didn't receive the code?</span>
+                        <button
+                          type="button"
+                          disabled={resendCooldown > 0 || loading}
+                          onClick={() => handleRequestOtp()}
+                          className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 disabled:opacity-50 inline-flex items-center gap-1"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+                          {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend OTP'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Input
+                      label="New Password"
+                      id="forgotNewPass"
+                      type="password"
+                      icon={Lock}
+                      placeholder="Minimum 6 characters"
+                      value={forgotNewPass}
+                      onChange={(e) => setForgotNewPass(e.target.value)}
+                      required
+                    />
+
+                    <Input
+                      label="Confirm New Password"
+                      id="forgotConfirmPass"
+                      type="password"
+                      icon={KeyRound}
+                      placeholder="Re-enter your new password"
+                      value={forgotConfirmPass}
+                      onChange={(e) => setForgotConfirmPass(e.target.value)}
+                      required
+                    />
+
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      loading={loading}
+                      icon={CheckCircle2}
+                      className="w-full mt-3"
+                    >
+                      Confirm & Update Password
+                    </Button>
+
+                    <div className="text-center pt-2">
+                      <button
+                        type="button"
+                        onClick={() => { setMode('login'); setError(''); setSuccessMsg(''); }}
+                        className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 font-semibold transition-colors"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5" /> Return to Sign In
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            ) : mode === 'login' ? (
               <form onSubmit={handleLoginSubmit} className="space-y-4">
                 <Input
                   label="Email or Official ID"
@@ -260,16 +492,34 @@ export const Login = () => {
                   required
                 />
 
-                <Input
-                  label="Password"
-                  id="password"
-                  type="password"
-                  icon={KeyRound}
-                  placeholder="Enter your account password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
+                <div>
+                  <Input
+                    label="Password"
+                    id="password"
+                    type="password"
+                    icon={KeyRound}
+                    placeholder="Enter your account password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
+                  <div className="flex items-center justify-between text-xs pt-1.5 px-0.5">
+                    <span className="text-slate-400">Can't remember password?</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode('forgot');
+                        setError('');
+                        setSuccessMsg('');
+                        setForgotStep('request');
+                        setForgotId(userId || '');
+                      }}
+                      className="font-semibold text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                </div>
 
                 <Button
                   type="submit"
@@ -284,7 +534,7 @@ export const Login = () => {
 
                 {!portalInfo.allowRegister && (
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-                    Staff & Department Officer accounts are centrally provisioned by the Central Supervisor Admin.
+                    Staff & Department Officer accounts can update their password independently using Mail OTP.
                   </p>
                 )}
               </form>

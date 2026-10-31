@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { ThemeToggle } from './ThemeToggle';
+import { LanguageSelector } from './LanguageSelector';
 import { DEMO_CREDENTIALS, ROLES } from '../../utils/constants';
 import { timeAgo } from '../../utils/statusHelpers';
 
@@ -103,8 +104,9 @@ export const Header = ({ onMobileMenuClick }) => {
         </div>
       </div>
 
-      {/* Right controls: Theme, Notifications, Profile dropdown */}
+      {/* Right controls: Language, Theme, Notifications, Profile dropdown */}
       <div className="flex items-center gap-2 sm:gap-3">
+        <LanguageSelector />
         <ThemeToggle />
 
         {/* Notifications Dropdown */}

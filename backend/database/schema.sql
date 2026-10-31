@@ -309,3 +309,18 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_r
 CREATE INDEX IF NOT EXISTS idx_escalations_status ON escalations(status, escalation_level);
 CREATE INDEX IF NOT EXISTS idx_session_expire ON user_sessions(expire);
 
+
+-- 19. PASSWORD RESET OTPS (For Citizen, Worker & Department Self-Service Password Reset)
+CREATE TABLE IF NOT EXISTS password_reset_otps (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    email VARCHAR(150) NOT NULL,
+    otp_code VARCHAR(10) NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    is_used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_reset_otps_user ON password_reset_otps(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_otps_email ON password_reset_otps(email);

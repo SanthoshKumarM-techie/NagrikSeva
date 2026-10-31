@@ -1,7 +1,16 @@
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import authRepository from './auth.repository.js';
 import ApiError from '../../utils/ApiError.js';
 import auditService from '../audit/audit.service.js';
+import mailService from '../../services/mail.service.js';
+
+function maskEmail(email) {
+  if (!email || !email.includes('@')) return email;
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) return `${local[0]}*@${domain}`;
+  return `${local.slice(0, 2)}***${local.slice(-1)}@${domain}`;
+}
 
 export const login = async ({ email, password, session, ipAddress, userAgent }) => {
   const user = await authRepository.findByEmail(email);
@@ -155,10 +164,125 @@ export const register = async ({ email, password, fullName, phoneNumber, role, d
   return userPayload;
 };
 
+export const requestPasswordResetOtp = async ({ identifier, ipAddress, userAgent }) => {
+  if (!identifier) {
+    throw ApiError.badRequest('Please enter your email or Official User ID.');
+  }
+
+  const cleanId = identifier.trim();
+  const user = await authRepository.findByEmail(cleanId);
+  if (!user) {
+    throw ApiError.notFound('No account found matching this email or User ID.');
+  }
+
+  if (!user.is_active) {
+    throw ApiError.forbidden('Your account is currently inactive. Please contact the administrator.');
+  }
+
+  // Generate a cryptographically secure 6-digit numeric OTP
+  const otpCode = crypto.randomInt(100000, 999999).toString();
+  // Valid for 10 minutes
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  // Store OTP in database
+  await authRepository.createOtp({
+    userId: user.id,
+    email: user.email,
+    otpCode,
+    expiresAt
+  });
+
+  // Asynchronously dispatch OTP mail
+  await mailService.sendPasswordResetOtpEmail({
+    toEmail: user.email,
+    fullName: user.full_name,
+    otpCode,
+    role: user.role,
+    userCode: user.user_code
+  });
+
+  // Log audit event
+  auditService.logEvent({
+    userId: user.id,
+    action: 'PASSWORD_RESET_REQUESTED',
+    entityType: 'AUTH',
+    entityId: user.id,
+    details: { email: user.email, role: user.role, userCode: user.user_code },
+    ipAddress,
+    userAgent
+  }).catch(err => console.error('Audit log failed:', err));
+
+  return {
+    success: true,
+    maskedEmail: maskEmail(user.email),
+    userCode: user.user_code,
+    role: user.role,
+    message: `A 6-digit verification code has been dispatched to ${maskEmail(user.email)}. It will expire in 10 minutes.`
+  };
+};
+
+export const resetPasswordWithOtp = async ({ identifier, otp, newPassword, ipAddress, userAgent }) => {
+  if (!identifier) {
+    throw ApiError.badRequest('Email or User ID is required.');
+  }
+  if (!otp || otp.trim().length !== 6) {
+    throw ApiError.badRequest('Please enter a valid 6-digit verification OTP code.');
+  }
+  if (!newPassword || newPassword.length < 6) {
+    throw ApiError.badRequest('New password must be at least 6 characters long.');
+  }
+
+  const cleanId = identifier.trim();
+  const user = await authRepository.findByEmail(cleanId);
+  if (!user) {
+    throw ApiError.notFound('User account not found.');
+  }
+
+  const validOtp = await authRepository.findValidOtp({
+    email: user.email,
+    otpCode: otp.trim()
+  });
+
+  if (!validOtp) {
+    throw ApiError.badRequest('Invalid or expired verification code. Please request a new OTP.');
+  }
+
+  // Hash new password
+  const saltRounds = 10;
+  const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+
+  // Update password in database
+  await authRepository.updatePassword({
+    userId: user.id,
+    passwordHash
+  });
+
+  // Mark OTP as used
+  await authRepository.markOtpUsed(validOtp.id);
+
+  // Log audit event
+  auditService.logEvent({
+    userId: user.id,
+    action: 'PASSWORD_RESET_COMPLETED',
+    entityType: 'AUTH',
+    entityId: user.id,
+    details: { email: user.email, role: user.role, userCode: user.user_code },
+    ipAddress,
+    userAgent
+  }).catch(err => console.error('Audit log failed:', err));
+
+  return {
+    success: true,
+    message: 'Your password has been successfully reset! You can now sign in with your new credentials.'
+  };
+};
+
 export default {
   login,
   register,
   logout,
-  getMe
+  getMe,
+  requestPasswordResetOtp,
+  resetPasswordWithOtp
 };
 
