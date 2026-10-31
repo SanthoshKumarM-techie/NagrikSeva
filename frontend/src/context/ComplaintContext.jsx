@@ -257,7 +257,22 @@ export const mapBackendComplaint = (c) => {
         role: t.changed_by_role || t.role || 'Staff'
       };
     }),
-    transfers: c.transfers || [],
+    transfers: (Array.isArray(c.transfers) ? c.transfers : []).map(tr => ({
+      id: tr.id,
+      complaintId: tr.complaintId || tr.complaint_id || c.id,
+      complaintDbId: tr.complaintId || tr.complaint_id || c.id,
+      complaintTitle: c.title,
+      fromDepartmentId: tr.fromDepartmentId || tr.from_department_id,
+      fromDepartmentName: tr.fromDepartmentName || tr.from_department_name,
+      toDepartmentId: tr.toDepartmentId || tr.to_department_id,
+      toDepartmentName: tr.toDepartmentName || tr.to_department_name || 'Pending Supervisor Assignment',
+      transferredBy: tr.transferredBy || tr.transferred_by || tr.transferred_by_name || tr.initiated_by_name || 'Department Officer',
+      transferNumber: tr.transferNumber || tr.transfer_number || 1,
+      reason: tr.reason || '',
+      status: tr.status || tr.receiving_decision || 'PENDING',
+      timestamp: tr.timestamp || tr.transferred_at || tr.created_at,
+      adminNotes: tr.adminNotes || tr.admin_notes
+    })),
     assignedWorkerId: c.assigned_worker_id || c.assignedWorkerId || null,
     assignedWorkerName: c.assigned_worker_name || c.assignedWorkerName || null,
     assignmentId: c.assignment_id || c.assignmentId || null,
@@ -366,7 +381,32 @@ export const ComplaintProvider = ({ children }) => {
 
       if (complaintsRes.status === 'fulfilled' && complaintsRes.value) {
         const mapped = complaintsRes.value.map(mapBackendComplaint);
-        setComplaints(mapped);
+        setComplaints(prev => {
+          const prevTransfersByComplaint = new Map();
+          (prev || []).forEach(c => {
+            if (c.transfers && c.transfers.length > 0) {
+              prevTransfersByComplaint.set(c.id, c.transfers);
+              if (c.ticketNumber) prevTransfersByComplaint.set(c.ticketNumber, c.transfers);
+            }
+          });
+
+          return mapped.map(c => {
+            const localTransfers = prevTransfersByComplaint.get(c.id) || prevTransfersByComplaint.get(c.ticketNumber) || [];
+            const combinedTransfers = [...(c.transfers || [])];
+            const seenTransferIds = new Set(combinedTransfers.map(t => t.id));
+            localTransfers.forEach(lt => {
+              if (!seenTransferIds.has(lt.id)) {
+                combinedTransfers.push(lt);
+              }
+            });
+            const hasPendingTransfer = combinedTransfers.some(t => t.status === 'PENDING');
+            return {
+              ...c,
+              transfers: combinedTransfers,
+              status: hasPendingTransfer ? COMPLAINT_STATUS.TRANSFERRED : c.status
+            };
+          });
+        });
       }
 
       const roleStr = (currentUser?.role || '').toLowerCase();
@@ -593,10 +633,12 @@ export const ComplaintProvider = ({ children }) => {
   };
 
   const transferDepartment = async (complaintId, targetDeptId, reason, officerUser) => {
+    const existingComp = complaints.find(c => c.id === complaintId || c.ticketNumber === complaintId || c.complaintId === complaintId);
+    const dbComplaintId = existingComp?.id || complaintId;
     let backendTransfer = null;
     try {
       backendTransfer = await transfersApi.initiateTransfer({
-        complaintId,
+        complaintId: dbComplaintId,
         toDepartmentId: targetDeptId || null,
         reason: reason || 'Transfer requested by department officer'
       });
