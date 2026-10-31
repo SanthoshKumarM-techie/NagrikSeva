@@ -1364,7 +1364,10 @@ export const ComplaintProvider = ({ children }) => {
         code: dept.code || dept.name.slice(0, 4).toUpperCase(),
         description: dept.description,
         contactEmail: dept.email || dept.contactEmail,
-        contactPhone: dept.phone || dept.contactPhone
+        contactPhone: dept.phone || dept.contactPhone,
+        headOfficer: dept.headOfficer,
+        initialPassword: dept.initialPassword,
+        address: dept.address
       });
       if (created) {
         const newDept = {
@@ -1390,7 +1393,23 @@ export const ComplaintProvider = ({ children }) => {
           fetchAllData().catch(() => {});
         }, 500);
 
-        return newDept;
+        if (created.officerAccount) {
+          const newOfficerUser = {
+            id: created.officerAccount.userCode,
+            name: created.officerAccount.fullName,
+            email: created.officerAccount.email,
+            phone: created.officerAccount.phone,
+            role: 'Department Officer',
+            department: created.name,
+            departmentId: created.id,
+            status: 'Active'
+          };
+          setUsers(prev => [...prev, newOfficerUser]);
+        }
+        return {
+          ...newDept,
+          officerAccount: created.officerAccount
+        };
       }
     } catch (err) {
       console.error('Backend add department error:', err);
