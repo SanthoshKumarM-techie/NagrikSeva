@@ -4,6 +4,7 @@ import { ShieldCheck, LogIn, KeyRound, User, AlertCircle, UserPlus, Sparkles, Ma
 import { useAuth } from '../../context/AuthContext';
 import { ROLES } from '../../utils/constants';
 import { checkRoleMatchesExpected } from '../../utils/userHelpers';
+import { sendPasswordResetOtpEmail } from '../../services/email/emailService';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import Select from '../../components/common/Select';
@@ -269,6 +270,16 @@ export const Login = () => {
         setForgotStep('reset');
         setResendCooldown(60);
         setSuccessMsg(res.data?.message || 'Verification OTP dispatched to your email.');
+
+        if (res.data?.email && res.data?.otpCode) {
+          sendPasswordResetOtpEmail({
+            toEmail: res.data.email,
+            fullName: res.data.fullName,
+            otpCode: res.data.otpCode,
+            role: res.data.role,
+            userCode: res.data.userCode
+          }).catch(err => console.warn('[EmailJS] OTP email dispatch note:', err));
+        }
       } else {
         setError(res.error || 'Failed to dispatch verification code.');
       }

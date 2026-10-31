@@ -22,6 +22,7 @@ import PageHeader from '../../components/layout/PageHeader';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import Input from '../../components/common/Input';
+import { sendDepartmentCredentialsEmail } from '../../services/email/emailService';
 
 export const Departments = () => {
   const { departments, complaints, addDepartment, updateDepartment } = useComplaints();
@@ -124,6 +125,16 @@ export const Departments = () => {
             departmentCode: cleanCode
           });
           setCredentialsModalOpen(true);
+
+          // Dispatch official credentials via EmailJS
+          sendDepartmentCredentialsEmail({
+            toEmail: res.officerAccount.email,
+            fullName: res.officerAccount.fullName,
+            userCode: res.officerAccount.userCode,
+            temporaryPassword: res.officerAccount.temporaryPassword,
+            departmentName: formData.name,
+            departmentCode: cleanCode
+          }).catch(err => console.warn('[EmailJS] Department credentials dispatch note:', err));
         } else {
           setSuccessToast(`Department "${formData.name}" registered successfully.`);
           setTimeout(() => setSuccessToast(''), 4000);
