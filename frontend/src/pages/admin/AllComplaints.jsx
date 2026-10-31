@@ -39,12 +39,14 @@ export const AllComplaints = () => {
 
   const filtered = useMemo(() => {
     return complaints.filter((c) => {
+      const searchLower = search.toLowerCase();
       const matchSearch =
         !search ||
-        c.id.toLowerCase().includes(search.toLowerCase()) ||
-        c.title.toLowerCase().includes(search.toLowerCase()) ||
-        c.location.toLowerCase().includes(search.toLowerCase()) ||
-        c.citizenName.toLowerCase().includes(search.toLowerCase());
+        (c.id && c.id.toLowerCase().includes(searchLower)) ||
+        (c.ticketNumber && c.ticketNumber.toLowerCase().includes(searchLower)) ||
+        (c.title && c.title.toLowerCase().includes(searchLower)) ||
+        (c.location && c.location.toLowerCase().includes(searchLower)) ||
+        (c.citizenName && c.citizenName.toLowerCase().includes(searchLower));
 
       const matchDept = !deptFilter || c.department === deptFilter;
       const matchCategory = !categoryFilter || c.category === categoryFilter;

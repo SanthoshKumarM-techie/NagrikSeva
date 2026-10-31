@@ -37,11 +37,14 @@ export const SystemAnalytics = () => {
     let isMounted = true;
     analyticsApi.getCityAnalytics()
       .then((data) => {
-        if (isMounted && data) {
-          setCityAnalytics(data);
+        const payload = data?.analytics || data?.data?.analytics || data?.data || data;
+        if (isMounted && payload) {
+          setCityAnalytics(payload);
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn('System analytics fetch note:', err?.message || err);
+      });
     return () => { isMounted = false; };
   }, []);
 

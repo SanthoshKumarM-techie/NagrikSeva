@@ -296,7 +296,7 @@ export const ComplaintProvider = ({ children }) => {
   const [wards, setWards] = useState(() => getStorage('nagrikseva_wards', FALLBACK_WARDS));
   const [workers, setWorkers] = useState(() => getStorage(STORAGE_KEYS.WORKERS, []));
   const [slas, setSlas] = useState(() => getStorage(STORAGE_KEYS.SLAS, []));
-  const [users, setUsers] = useState(() => getStorage(STORAGE_KEYS.USERS, []));
+  const [users, setUsers] = useState(() => getStorage(STORAGE_KEYS.USERS, INITIAL_USERS));
   const [loading, setLoading] = useState(false);
 
   // Sync to local storage
@@ -441,7 +441,7 @@ export const ComplaintProvider = ({ children }) => {
         }
       }
 
-      // Fetch SLA rules only if admin
+      // Fetch SLA rules and users if admin
       if (isAdmin) {
         try {
           const slaRes = await slaApi.getRules();
@@ -460,6 +460,30 @@ export const ComplaintProvider = ({ children }) => {
           }
         } catch {
           // Silent fallback
+        }
+
+        try {
+          const usersRes = await usersApi.listUsers({ limit: 100 });
+          const userList = Array.isArray(usersRes) ? usersRes : (usersRes?.users || []);
+          if (userList.length > 0) {
+            const mappedUsers = userList.map(u => ({
+              id: u.user_code || u.userCode || u.id,
+              dbId: u.id,
+              userCode: u.user_code || u.userCode || u.id,
+              name: u.full_name || u.name,
+              email: u.email,
+              phone: u.phone,
+              role: u.role,
+              departmentId: u.department_id,
+              department: u.department_name || departments.find(d => d.id === u.department_id)?.name || 'General',
+              status: u.is_active === false ? 'Inactive' : 'Active',
+              joinedDate: (u.created_at || new Date().toISOString()).split('T')[0],
+              verified: Boolean(u.is_verified)
+            }));
+            setUsers(mappedUsers);
+          }
+        } catch (err) {
+          console.warn('Admin fetch users warning:', err?.message || err);
         }
       }
 
