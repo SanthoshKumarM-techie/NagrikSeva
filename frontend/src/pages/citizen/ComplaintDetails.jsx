@@ -16,7 +16,8 @@ import {
   Image as ImageIcon,
   Check,
   Navigation,
-  LocateFixed
+  LocateFixed,
+  Star
 } from 'lucide-react';
 import { useComplaints } from '../../context/ComplaintContext';
 import { useAuth } from '../../context/AuthContext';
