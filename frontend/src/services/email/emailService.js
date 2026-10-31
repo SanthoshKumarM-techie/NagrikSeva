@@ -299,9 +299,141 @@ export const sendCitizenTrackerEmail = async ({ complaint, recipientEmail, recip
   }
 };
 
+/**
+ * Sends a Department Officer Credentials Onboarding Email using EmailJS
+ */
+export const sendDepartmentCredentialsEmail = async ({
+  toEmail,
+  fullName,
+  userCode,
+  temporaryPassword,
+  departmentName,
+  departmentCode,
+  loginUrl
+}) => {
+  const createdAt = new Date().toISOString();
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173';
+  const targetUrl = loginUrl || `${origin}/login?portal=officer`;
+
+  const templateParams = {
+    to_email: toEmail,
+    to_name: fullName || 'Department Officer',
+    officer_name: fullName || 'Department Officer',
+    user_code: userCode,
+    temporary_password: temporaryPassword,
+    department_name: departmentName,
+    department_code: departmentCode,
+    login_url: targetUrl,
+    subject: `🏛️ [NagrikSeva] Official Credentials for ${departmentName} (${userCode})`,
+    message: `Your nodal officer account for ${departmentName} (${departmentCode}) has been created.\nOfficial ID: ${userCode}\nEmail: ${toEmail}\nInitial Password: ${temporaryPassword}\nLogin Portal: ${targetUrl}`
+  };
+
+  const serviceId = emailConfig.serviceId || 'service_onag5la';
+  const templateId = emailConfig.templates.departmentCredentials || emailConfig.templates.citizenTracker;
+  const publicKey = emailConfig.publicKey || 'J1aG-MvZT97FKxvjO';
+
+  try {
+    const response = await emailjs.send(serviceId, templateId, templateParams, publicKey);
+    const log = logEmailNotification({
+      complaint_id: userCode || 'DEPT-CRED',
+      recipient_email: toEmail,
+      recipient_type: 'OFFICER',
+      notification_type: 'DEPARTMENT_CREDENTIALS',
+      delivery_attempt_status: 'SENT',
+      error_message: null,
+      created_at: createdAt,
+      sent_at: new Date().toISOString(),
+      subject: templateParams.subject,
+      metadata: { response }
+    });
+    console.log(`[EmailJS] ✉️ Department credentials email sent to ${toEmail}`);
+    return { success: true, response, log };
+  } catch (err) {
+    console.warn('[EmailJS] Department credentials email dispatch note:', err?.text || err?.message);
+    const log = logEmailNotification({
+      complaint_id: userCode || 'DEPT-CRED',
+      recipient_email: toEmail,
+      recipient_type: 'OFFICER',
+      notification_type: 'DEPARTMENT_CREDENTIALS',
+      delivery_attempt_status: 'SIMULATED',
+      error_message: err?.text || err?.message || 'EmailJS simulated dispatch',
+      created_at: createdAt,
+      sent_at: new Date().toISOString(),
+      subject: templateParams.subject
+    });
+    return { success: true, simulated: true, log };
+  }
+};
+
+/**
+ * Sends a Password Reset OTP Email using EmailJS
+ */
+export const sendPasswordResetOtpEmail = async ({
+  toEmail,
+  fullName,
+  otpCode,
+  role = 'CITIZEN',
+  userCode
+}) => {
+  const createdAt = new Date().toISOString();
+  const serviceId = emailConfig.resetAccount?.serviceId || emailConfig.serviceId;
+  const publicKey = emailConfig.resetAccount?.publicKey || emailConfig.publicKey;
+  const isWorker = role === 'FIELD_WORKER' || role === 'WORKER';
+  const templateId = isWorker
+    ? (emailConfig.templates.workerReset || 'template_ju6u0np')
+    : (emailConfig.templates.citizenReset || 'template_2lumkdp');
+
+  const templateParams = {
+    to_email: toEmail,
+    to_name: fullName || 'User',
+    recipient_email: toEmail,
+    otp_code: otpCode,
+    otp: otpCode,
+    passcode: otpCode,
+    user_code: userCode || '',
+    role: role,
+    subject: `🔐 [NagrikSeva] Your Password Reset OTP is ${otpCode}`,
+    message: `Your One-Time Password for password recovery is: ${otpCode}. It is valid for 10 minutes.`
+  };
+
+  try {
+    const response = await emailjs.send(serviceId, templateId, templateParams, publicKey);
+    const log = logEmailNotification({
+      complaint_id: userCode || 'AUTH-RESET',
+      recipient_email: toEmail,
+      recipient_type: role || 'USER',
+      notification_type: 'PASSWORD_RESET_OTP',
+      delivery_attempt_status: 'SENT',
+      error_message: null,
+      created_at: createdAt,
+      sent_at: new Date().toISOString(),
+      subject: templateParams.subject,
+      metadata: { response }
+    });
+    console.log(`[EmailJS] ✉️ Password reset OTP email sent to ${toEmail}`);
+    return { success: true, response, log };
+  } catch (err) {
+    console.warn('[EmailJS] Password reset OTP email dispatch note:', err?.text || err?.message);
+    const log = logEmailNotification({
+      complaint_id: userCode || 'AUTH-RESET',
+      recipient_email: toEmail,
+      recipient_type: role || 'USER',
+      notification_type: 'PASSWORD_RESET_OTP',
+      delivery_attempt_status: 'SIMULATED',
+      error_message: err?.text || err?.message || 'EmailJS simulated dispatch',
+      created_at: createdAt,
+      sent_at: new Date().toISOString(),
+      subject: templateParams.subject
+    });
+    return { success: true, simulated: true, log };
+  }
+};
+
 export default {
   sendWorkerAssignmentEmail,
   sendCitizenTrackerEmail,
+  sendDepartmentCredentialsEmail,
+  sendPasswordResetOtpEmail,
   logEmailNotification,
   getEmailNotificationLogs
 };

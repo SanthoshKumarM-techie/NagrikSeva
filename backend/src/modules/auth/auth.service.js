@@ -261,6 +261,9 @@ export const requestPasswordResetOtp = async ({ identifier, ipAddress, userAgent
     maskedEmail: maskEmail(user.email),
     userCode: user.user_code,
     role: user.role,
+    otpCode: otpCode,
+    email: user.email,
+    fullName: user.full_name,
     message: `A 6-digit verification code has been dispatched to ${maskEmail(user.email)}. It will expire in 10 minutes.`
   };
 };
