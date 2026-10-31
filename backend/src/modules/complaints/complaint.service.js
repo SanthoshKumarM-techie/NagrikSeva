@@ -2,6 +2,7 @@ import complaintRepository from './complaint.repository.js';
 import categoryRepository from '../categories/category.repository.js';
 import departmentRepository from '../departments/department.repository.js';
 import evidenceRepository from '../evidence/evidence.repository.js';
+import assignmentRepository from '../assignments/assignment.repository.js';
 import notificationService from '../notifications/notification.service.js';
 import auditService from '../audit/audit.service.js';
 import generateTicketNumber from '../../utils/generateTicketNumber.js';
@@ -240,17 +241,19 @@ export const getComplaintById = async (id, currentUserId = null) => {
     throw ApiError.notFound('Complaint not found');
   }
 
-  const [evidence, timeline, isSupported] = await Promise.all([
+  const [evidence, timeline, isSupported, workUpdates] = await Promise.all([
     evidenceRepository.findByComplaintId(complaint.id),
     complaintRepository.getStatusHistory(complaint.id),
-    currentUserId ? complaintRepository.isSupportedBy(complaint.id, currentUserId) : Promise.resolve(false)
+    currentUserId ? complaintRepository.isSupportedBy(complaint.id, currentUserId) : Promise.resolve(false),
+    assignmentRepository.getWorkUpdatesByComplaintId(complaint.id).catch(() => [])
   ]);
 
   return {
     ...complaint,
     is_supported_by_me: isSupported,
     evidence,
-    timeline
+    timeline,
+    work_updates: workUpdates || []
   };
 };
 

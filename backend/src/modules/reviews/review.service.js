@@ -54,7 +54,7 @@ export const officerVerify = async (complaintId, officerUser, data, clientInfo =
         userId: complaint.citizen_id,
         complaintId: complaint.id,
         title: 'Issue Resolved – Please Confirm',
-        message: `Department officer verified the work for #${complaint.ticket_number}. Please inspect the fix and confirm or dispute resolution.`,
+        message: `Department officer verified the work for #${complaint.ticket_number}. Please inspect the fix and confirm or request rework.`,
         notificationType: 'STATUS_UPDATED'
       }).catch(console.error);
     } else {
@@ -64,13 +64,13 @@ export const officerVerify = async (complaintId, officerUser, data, clientInfo =
       );
       if (assignments.rows.length > 0) {
         await client.query(
-          `UPDATE worker_assignments SET status = 'IN_PROGRESS' WHERE id = $1`,
+          `UPDATE worker_assignments SET status = 'REWORK_REQUIRED' WHERE id = $1`,
           [assignments.rows[0].id]
         );
         notificationService.notifyUser({
           userId: assignments.rows[0].worker_id,
           complaintId: complaint.id,
-          title: 'Rework Requested',
+          title: 'Remediation Rework Requested',
           message: `Officer requested rework on #${complaint.ticket_number}: "${data.reworkInstructions}"`,
           notificationType: 'STATUS_UPDATED'
         }).catch(console.error);
@@ -104,12 +104,11 @@ export const citizenReview = async (complaintId, citizenId, data, clientInfo = {
     throw ApiError.forbidden('Only the citizen who filed this complaint or registered supporters can confirm or dispute its resolution');
   }
 
-  if (complaint.current_status !== 'RESOLVED') {
-    throw ApiError.badRequest('Citizen review can only be submitted when complaint is in RESOLVED status');
+  if (complaint.current_status !== 'RESOLVED' && complaint.current_status !== 'VERIFICATION') {
+    throw ApiError.badRequest('Citizen review can only be submitted when complaint is in RESOLVED or VERIFICATION status');
   }
 
-  const isConfirmed = data.decision === 'CONFIRMED';
-  const newStatus = isConfirmed ? 'CLOSED' : 'DISPUTED';
+  const isConfirmed = data.decision === 'CONFIRMED' || data.decision === 'APPROVED';
 
   return await db.withTransaction(async (client) => {
     // 1. Create review entry
@@ -117,66 +116,110 @@ export const citizenReview = async (complaintId, citizenId, data, clientInfo = {
       complaintId: complaint.id,
       reviewerId: citizenId,
       reviewType: 'CITIZEN_VERIFICATION',
-      decision: isConfirmed ? 'CONFIRMED' : 'DISPUTED',
-      feedback: data.feedback
+      decision: isConfirmed ? 'CONFIRMED' : 'REWORK_REQUIRED',
+      feedback: data.feedback || data.reason || (isConfirmed ? 'Resolution confirmed by citizen' : 'Rework requested')
     }, client);
 
-    // 2. Update complaint status
-    await complaintRepository.updateStatus(complaint.id, newStatus, client);
-
     if (isConfirmed) {
+      // 2. Status -> CLOSED
+      await complaintRepository.updateStatus(complaint.id, 'CLOSED', client);
+
+      // Record closed_at timestamp
+      await client.query(`UPDATE complaints SET closed_at = CURRENT_TIMESTAMP WHERE id = $1`, [complaint.id]);
+
       // Status history: RESOLVED -> CLOSED
       await complaintRepository.addStatusHistory({
         complaintId: complaint.id,
-        fromStatus: 'RESOLVED',
+        fromStatus: complaint.current_status,
         toStatus: 'CLOSED',
         changedBy: citizenId,
-        remarks: `Resolution confirmed by citizen. Rating: ${data.rating || 'N/A'}/5. Feedback: ${data.feedback || 'None'}`
+        remarks: `Resolution confirmed by citizen. Rating: ${data.rating || 'N/A'}/5. Feedback: ${data.feedback || 'None'}. Case is officially closed.`
       }, client);
 
       // Notify department officers
       notificationService.notifyDepartmentOfficers({
         departmentId: complaint.department_id,
         complaintId: complaint.id,
-        title: 'Resolution Confirmed',
+        title: 'Resolution Confirmed by Citizen',
         message: `Citizen confirmed resolution for #${complaint.ticket_number}. Ticket is now officially CLOSED.`,
         notificationType: 'STATUS_UPDATED'
       }).catch(console.error);
-    } else {
-      // DISPUTED: Trigger Level 2 Escalation
-      await reviewRepository.createEscalation({
-        complaintId: complaint.id,
-        escalationLevel: 'LEVEL_2',
-        reason: `Citizen disputed resolution: ${data.feedback}`,
-        triggeredBy: 'CITIZEN_DISPUTE'
-      }, client);
 
-      // Status history: RESOLVED -> DISPUTED
+      // Notify assigned worker
+      const workerRes = await client.query(
+        `SELECT worker_id FROM worker_assignments WHERE complaint_id = $1 ORDER BY assigned_at DESC LIMIT 1`,
+        [complaint.id]
+      );
+      if (workerRes.rows[0]?.worker_id) {
+        notificationService.notifyUser({
+          userId: workerRes.rows[0].worker_id,
+          complaintId: complaint.id,
+          title: 'Work Approved by Citizen',
+          message: `Citizen inspected and confirmed remediation for #${complaint.ticket_number}. Work order successfully closed.`,
+          notificationType: 'STATUS_UPDATED'
+        }).catch(console.error);
+      }
+    } else {
+      // REWORK: Restart the workflow until citizen approves
+      const feedback = data.feedback || data.reason || 'Remediation unsatisfactory. Defect remains on site.';
+
+      // 1. Move complaint status back to WORK_IN_PROGRESS
+      await complaintRepository.updateStatus(complaint.id, 'WORK_IN_PROGRESS', client);
+
+      // 2. Set active worker assignment to REWORK_REQUIRED
+      const assignments = await client.query(
+        `SELECT id, worker_id FROM worker_assignments WHERE complaint_id = $1 ORDER BY assigned_at DESC LIMIT 1`,
+        [complaint.id]
+      );
+      if (assignments.rows.length > 0) {
+        await client.query(
+          `UPDATE worker_assignments SET status = 'REWORK_REQUIRED' WHERE id = $1`,
+          [assignments.rows[0].id]
+        );
+
+        // Alert the worker directly with the citizen's rework reason
+        notificationService.notifyUser({
+          userId: assignments.rows[0].worker_id,
+          complaintId: complaint.id,
+          title: 'Remediation Rework Requested by Citizen',
+          message: `Citizen rejected work on #${complaint.ticket_number}. Rework required: "${feedback}". Please return to site and rectify.`,
+          notificationType: 'STATUS_UPDATED'
+        }).catch(console.error);
+      }
+
+      // 3. Status history
       await complaintRepository.addStatusHistory({
         complaintId: complaint.id,
-        fromStatus: 'RESOLVED',
-        toStatus: 'DISPUTED',
+        fromStatus: complaint.current_status,
+        toStatus: 'WORK_IN_PROGRESS',
         changedBy: citizenId,
-        remarks: `Citizen disputed resolution: ${data.feedback}. Escalated to Level 2.`
+        remarks: `Remediation Rework Requested by Citizen: "${feedback}". Workflow restarted for contractor remediation.`
       }, client);
 
-      // Alert Department Officers & Super Admin
+      // 4. Alert Department Officers & Super Admin
       notificationService.notifyDepartmentOfficers({
         departmentId: complaint.department_id,
         complaintId: complaint.id,
-        title: 'RESOLUTION DISPUTED (Level 2 Escalation)',
-        message: `Citizen disputed resolution on #${complaint.ticket_number}: "${data.feedback}"`,
+        title: 'Work Rejected by Citizen (Rework Ordered)',
+        message: `Citizen rejected resolution on #${complaint.ticket_number} and requested rework: "${feedback}".`,
         notificationType: 'SLA_ESCALATION'
+      }).catch(console.error);
+
+      notificationService.notifyAdmins({
+        complaintId: complaint.id,
+        title: 'Citizen Rework Loop Triggered',
+        message: `Citizen rejected work on #${complaint.ticket_number} (Ward: ${complaint.ward_name || 'N/A'}). Rework required: "${feedback}".`,
+        type: 'ADMIN_ALERT'
       }).catch(console.error);
     }
 
-    // 3. Audit log
+    // 5. Audit log
     auditService.logEvent({
       userId: citizenId,
-      action: isConfirmed ? 'CITIZEN_CONFIRM_RESOLUTION' : 'CITIZEN_DISPUTE_RESOLUTION',
+      action: isConfirmed ? 'CITIZEN_CONFIRM_RESOLUTION' : 'CITIZEN_REJECT_REWORK',
       entityType: 'REVIEW',
       entityId: review.id,
-      details: { complaintId, decision: data.decision, rating: data.rating },
+      details: { complaintId, decision: isConfirmed ? 'CONFIRMED' : 'REWORK_REQUIRED', rating: data.rating, feedback: data.feedback },
       ipAddress: clientInfo.ip,
       userAgent: clientInfo.userAgent
     }).catch(console.error);

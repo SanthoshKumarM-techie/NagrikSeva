@@ -192,7 +192,7 @@ export const logInspection = async (assignmentId, workerId, data, clientInfo = {
       fromStatus: assignment.complaint_status,
       toStatus: 'INSPECTION',
       changedBy: workerId,
-      remarks: `Site inspection conducted: ${data.description}`
+      remarks: `Site inspection conducted: ${description}`
     }, client);
 
     // 5. Notify citizen
@@ -209,7 +209,7 @@ export const logInspection = async (assignmentId, workerId, data, clientInfo = {
       action: 'LOG_INSPECTION',
       entityType: 'ASSIGNMENT',
       entityId: assignment.id,
-      details: { description: data.description },
+      details: { description },
       ipAddress: clientInfo.ip,
       userAgent: clientInfo.userAgent
     }).catch(console.error);
@@ -218,7 +218,7 @@ export const logInspection = async (assignmentId, workerId, data, clientInfo = {
   });
 };
 
-export const startRemediation = async (assignmentId, workerId, clientInfo = {}, currentUser = null) => {
+export const startRemediation = async (assignmentId, workerId, data = {}, clientInfo = {}, currentUser = null) => {
   const assignment = await assignmentRepository.findById(assignmentId);
   if (!assignment) {
     throw ApiError.notFound('Assignment not found');
@@ -229,23 +229,59 @@ export const startRemediation = async (assignmentId, workerId, clientInfo = {}, 
     throw ApiError.forbidden('You are not assigned to this complaint');
   }
 
+  const description = data.description || data.notes || 'Remediation work has begun on site';
+  const startDate = data.startDate || new Date().toISOString();
+
   return await db.withTransaction(async (client) => {
+    // 1. Update assignment & complaint status
     await assignmentRepository.updateAssignmentStatus(assignment.id, 'IN_PROGRESS', client);
     await complaintRepository.updateStatus(assignment.complaint_id, 'WORK_IN_PROGRESS', client);
 
+    // 2. Set work_started_at timestamp on complaint
+    await client.query(`
+      UPDATE complaints 
+      SET work_started_at = $2 
+      WHERE id = $1
+    `, [assignment.complaint_id, startDate]);
+
+    // 3. Create work update entry
+    await assignmentRepository.createWorkUpdate({
+      assignmentId: assignment.id,
+      workerId,
+      updateType: 'WORK_STARTED',
+      description: `Work started on ${new Date(startDate).toLocaleDateString()}: ${description}`
+    }, client);
+
+    // 4. Attach any initial work start evidence photos
+    if (data.evidenceUrls && Array.isArray(data.evidenceUrls)) {
+      for (const url of data.evidenceUrls) {
+        await evidenceRepository.create({
+          complaintId: assignment.complaint_id,
+          uploadedBy: workerId,
+          stage: 'WORKER_BEFORE',
+          fileUrl: url,
+          fileType: 'image/jpeg',
+          fileSizeBytes: 0,
+          caption: 'Work start photo'
+        }, client);
+      }
+    }
+
+    // 5. Status history
     await complaintRepository.addStatusHistory({
       complaintId: assignment.complaint_id,
       fromStatus: assignment.complaint_status,
       toStatus: 'WORK_IN_PROGRESS',
       changedBy: workerId,
-      remarks: 'Remediation work has begun on site'
+      remarks: `Remediation work officially begun. Start Date: ${new Date(startDate).toLocaleString()}. Plan: ${description}`
     }, client);
 
+    // 6. Notify citizen
     notificationService.notifyUser({
       userId: assignment.citizen_id,
       complaintId: assignment.complaint_id,
-      title: 'Work In Progress',
-      message: `Field remediation work has officially started on complaint #${assignment.ticket_number}.`,
+      title: 'Work In Progress on Site',
+      message: `Field remediation work has officially started on complaint #${assignment.ticket_number}. Plan: "${description}"`,
       notificationType: 'STATUS_UPDATED'
     }).catch(console.error);
 
@@ -254,7 +290,7 @@ export const startRemediation = async (assignmentId, workerId, clientInfo = {}, 
       action: 'START_REMEDIATION',
       entityType: 'ASSIGNMENT',
       entityId: assignment.id,
-      details: {},
+      details: { startDate, description },
       ipAddress: clientInfo.ip,
       userAgent: clientInfo.userAgent
     }).catch(console.error);
@@ -262,6 +298,101 @@ export const startRemediation = async (assignmentId, workerId, clientInfo = {}, 
     return {
       status: 'WORK_IN_PROGRESS',
       assignment: { id: assignment.id, status: 'IN_PROGRESS' }
+    };
+  });
+};
+
+export const reportWorkDelay = async (assignmentId, workerId, data, clientInfo = {}, currentUser = null) => {
+  const assignment = await assignmentRepository.findById(assignmentId);
+  if (!assignment) {
+    throw ApiError.notFound('Assignment not found');
+  }
+
+  const isStaff = currentUser?.role === 'SUPER_ADMIN' || currentUser?.role === 'DEPARTMENT_OFFICER' || currentUser?.role === 'ADMIN';
+  if (assignment.worker_id !== workerId && !isStaff) {
+    throw ApiError.forbidden('You are not assigned to this complaint');
+  }
+
+  const { delayReason, description, estimatedCompletionDate, evidenceUrls = [] } = data;
+
+  return await db.withTransaction(async (client) => {
+    // 1. Create work update entry for DELAY
+    const technicalDetails = JSON.stringify({
+      delayReason,
+      estimatedCompletionDate,
+      reportedAt: new Date().toISOString()
+    });
+
+    const update = await assignmentRepository.createWorkUpdate({
+      assignmentId: assignment.id,
+      workerId,
+      updateType: 'DELAY',
+      description: `[Work Delay: ${delayReason}] ${description} (Revised Target: ${estimatedCompletionDate})`,
+      technicalDetails
+    }, client);
+
+    // 2. Attach delay photo evidence
+    for (const url of evidenceUrls) {
+      await evidenceRepository.create({
+        complaintId: assignment.complaint_id,
+        uploadedBy: workerId,
+        stage: 'WORKER_BEFORE',
+        fileUrl: url,
+        fileType: 'image/jpeg',
+        fileSizeBytes: 0,
+        caption: `Site Delay Evidence: ${delayReason}`
+      }, client);
+    }
+
+    // 3. Status history entry
+    await complaintRepository.addStatusHistory({
+      complaintId: assignment.complaint_id,
+      fromStatus: assignment.complaint_status,
+      toStatus: assignment.complaint_status,
+      changedBy: workerId,
+      remarks: `Work Delay Reported by Contractor: "${delayReason}" - ${description}. Revised Target Date: ${estimatedCompletionDate}. Delay photographic proof attached.`
+    }, client);
+
+    // 4. Multi-role Notifications:
+    // A) Notify Citizen
+    notificationService.notifyUser({
+      userId: assignment.citizen_id,
+      complaintId: assignment.complaint_id,
+      title: 'Work Delay Notification',
+      message: `Contractor reported an on-site delay for #${assignment.ticket_number}: ${delayReason}. "${description}". Expected completion: ${estimatedCompletionDate}.`,
+      notificationType: 'WORK_DELAY'
+    }).catch(console.error);
+
+    // B) Notify Department Officers
+    notificationService.notifyDepartmentOfficers({
+      departmentId: assignment.department_id,
+      complaintId: assignment.complaint_id,
+      title: 'On-Site Work Delay Flagged',
+      message: `Worker ${assignment.worker_name} reported delay for #${assignment.ticket_number}: ${delayReason} - "${description}". Revised completion: ${estimatedCompletionDate}.`,
+      notificationType: 'DEPARTMENT_ALERT'
+    }).catch(console.error);
+
+    // C) Notify Super Admins
+    notificationService.notifyAdmins({
+      complaintId: assignment.complaint_id,
+      title: 'Civic Work Delay Alert',
+      message: `Work delay flagged on #${assignment.ticket_number} (${delayReason}). Revised completion target: ${estimatedCompletionDate}.`,
+      type: 'ADMIN_ALERT'
+    }).catch(console.error);
+
+    auditService.logEvent({
+      userId: workerId,
+      action: 'REPORT_WORK_DELAY',
+      entityType: 'ASSIGNMENT',
+      entityId: assignment.id,
+      details: { delayReason, description, estimatedCompletionDate, evidenceCount: evidenceUrls.length },
+      ipAddress: clientInfo.ip,
+      userAgent: clientInfo.userAgent
+    }).catch(console.error);
+
+    return {
+      message: 'Work delay reported successfully. Notifications dispatched to citizen, department, and super admin.',
+      update
     };
   });
 };
@@ -281,7 +412,9 @@ export const addProgressUpdate = async (assignmentId, workerId, data, clientInfo
       assignmentId,
       workerId,
       updateType: data.updateType || 'PROGRESS',
-      description: data.description
+      description: data.description,
+      materialsUsed: data.materialsUsed,
+      technicalDetails: data.technicalDetails
     }, client);
 
     if (data.evidenceUrls && Array.isArray(data.evidenceUrls)) {
@@ -327,11 +460,14 @@ export const completeWork = async (assignmentId, workerId, data, clientInfo = {}
     ? data.evidenceUrls
     : (data.afterEvidenceUrls && data.afterEvidenceUrls.length > 0 ? data.afterEvidenceUrls : []);
 
-  const evidenceUrls = rawEvidence.length > 0
-    ? rawEvidence
-    : ['https://ikrdqbyrgzhjslnbqzqy.supabase.co/storage/v1/object/public/complaint-evidence/sample-work-completed.jpg'];
+  if (rawEvidence.length === 0) {
+    throw ApiError.badRequest('Photo evidence of completed work is mandatory before marking work as completed.');
+  }
 
-  const description = data.description || data.completionNotes || data.notes || 'Remediation completed';
+  const description = data.description || data.completionNotes || data.notes;
+  if (!description || description.trim().length < 5) {
+    throw ApiError.badRequest('Mandatory completion details of at least 5 characters is required.');
+  }
 
   return await db.withTransaction(async (client) => {
     // 1. Create completion work update
@@ -339,11 +475,13 @@ export const completeWork = async (assignmentId, workerId, data, clientInfo = {}
       assignmentId: assignment.id,
       workerId,
       updateType: 'COMPLETION_SUBMITTED',
-      description
+      description,
+      materialsUsed: data.materialsUsed,
+      technicalDetails: data.technicalDetails
     }, client);
 
     // 2. Attach AFTER evidence
-    for (const url of evidenceUrls) {
+    for (const url of rawEvidence) {
       await evidenceRepository.create({
         complaintId: assignment.complaint_id,
         uploadedBy: workerId,
@@ -367,7 +505,7 @@ export const completeWork = async (assignmentId, workerId, data, clientInfo = {}
       fromStatus: assignment.complaint_status,
       toStatus: 'VERIFICATION',
       changedBy: workerId,
-      remarks: `Work completed by contractor & crew: ${data.description}. Evidence submitted for officer verification.`
+      remarks: `Work completed by contractor & crew: ${description}. Evidence submitted for verification.`
     }, client);
 
     // 6. Notify Department Officers
@@ -384,7 +522,7 @@ export const completeWork = async (assignmentId, workerId, data, clientInfo = {}
       userId: assignment.citizen_id,
       complaintId: assignment.complaint_id,
       title: 'Work Completed on Site',
-      message: `Work on complaint #${assignment.ticket_number} has been completed and submitted for officer inspection.`,
+      message: `Work on complaint #${assignment.ticket_number} has been completed and submitted for inspection & confirmation.`,
       notificationType: 'STATUS_UPDATED'
     }).catch(console.error);
 
@@ -393,7 +531,7 @@ export const completeWork = async (assignmentId, workerId, data, clientInfo = {}
       action: 'COMPLETE_WORK',
       entityType: 'ASSIGNMENT',
       entityId: assignment.id,
-      details: { description: data.description, evidenceCount: data.evidenceUrls.length },
+      details: { description, evidenceCount: rawEvidence.length },
       ipAddress: clientInfo.ip,
       userAgent: clientInfo.userAgent
     }).catch(console.error);
@@ -413,6 +551,7 @@ export default {
   acceptAssignment,
   logInspection,
   startRemediation,
+  reportWorkDelay,
   addProgressUpdate,
   completeWork
 };

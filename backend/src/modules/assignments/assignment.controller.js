@@ -32,8 +32,14 @@ export const logInspection = asyncHandler(async (req, res) => {
 
 export const startRemediation = asyncHandler(async (req, res) => {
   const clientInfo = { ip: req.ip, userAgent: req.get('user-agent') };
-  const result = await assignmentService.startRemediation(req.params.id, req.user.id, clientInfo, req.user);
+  const result = await assignmentService.startRemediation(req.params.id, req.user.id, req.body, clientInfo, req.user);
   return ApiResponse.success(res, 200, result, 'Remediation work marked as in-progress');
+});
+
+export const reportWorkDelay = asyncHandler(async (req, res) => {
+  const clientInfo = { ip: req.ip, userAgent: req.get('user-agent') };
+  const result = await assignmentService.reportWorkDelay(req.params.id, req.user.id, req.body, clientInfo, req.user);
+  return ApiResponse.success(res, 200, result, 'Work delay reported and notifications dispatched');
 });
 
 export const addProgressUpdate = asyncHandler(async (req, res) => {
@@ -55,7 +61,7 @@ export default {
   acceptAssignment,
   logInspection,
   startRemediation,
+  reportWorkDelay,
   addProgressUpdate,
   completeWork
 };
-

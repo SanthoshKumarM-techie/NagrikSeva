@@ -75,7 +75,7 @@ export const findWorkerTasks = async (workerId, { status } = {}) => {
 
   if (status) {
     if (status === 'ACTIVE') {
-      query += ` AND a.status IN ('ASSIGNED', 'ACCEPTED', 'INSPECTION', 'IN_PROGRESS')`;
+      query += ` AND a.status IN ('ASSIGNED', 'ACCEPTED', 'INSPECTION', 'IN_PROGRESS', 'REWORK_REQUIRED')`;
     } else {
       params.push(status);
       query += ` AND a.status = $${params.length}::assignment_status`;
@@ -115,7 +115,7 @@ export const createWorkUpdate = async ({
   const query = `
     INSERT INTO work_updates (assignment_id, updated_by, update_type, notes, materials_used, technical_details)
     VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING id, assignment_id, updated_by as worker_id, update_type, notes as description, created_at;
+    RETURNING id, assignment_id, updated_by as worker_id, update_type, notes as description, materials_used, technical_details, created_at;
   `;
   const result = await client.query(query, [
     assignmentId,
@@ -131,12 +131,29 @@ export const createWorkUpdate = async ({
 export const getWorkUpdatesByAssignment = async (assignmentId) => {
   const query = `
     SELECT u.id, u.assignment_id, u.updated_by as worker_id, u.update_type,
-           u.notes as description, u.materials_used, u.technical_details, u.created_at
+           u.notes as description, u.materials_used, u.technical_details, u.created_at,
+           usr.full_name as worker_name, usr.user_code as worker_code
     FROM work_updates u
+    LEFT JOIN users usr ON u.updated_by = usr.id
     WHERE u.assignment_id = $1
     ORDER BY u.created_at ASC;
   `;
   const result = await db.query(query, [assignmentId]);
+  return result.rows;
+};
+
+export const getWorkUpdatesByComplaintId = async (complaintId) => {
+  const query = `
+    SELECT u.id, u.assignment_id, u.updated_by as worker_id, u.update_type,
+           u.notes as description, u.materials_used, u.technical_details, u.created_at,
+           usr.full_name as worker_name, usr.user_code as worker_code
+    FROM work_updates u
+    JOIN worker_assignments a ON u.assignment_id = a.id
+    LEFT JOIN users usr ON u.updated_by = usr.id
+    WHERE a.complaint_id = $1
+    ORDER BY u.created_at ASC;
+  `;
+  const result = await db.query(query, [complaintId]);
   return result.rows;
 };
 
@@ -147,5 +164,6 @@ export default {
   findWorkerTasks,
   updateAssignmentStatus,
   createWorkUpdate,
-  getWorkUpdatesByAssignment
+  getWorkUpdatesByAssignment,
+  getWorkUpdatesByComplaintId
 };

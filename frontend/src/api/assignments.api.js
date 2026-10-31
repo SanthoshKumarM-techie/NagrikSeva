@@ -12,7 +12,6 @@ export const assignmentsApi = {
   },
 
   createAssignment: async (data) => {
-    // data: { complaintId, workerId, assignmentNotes }
     const response = await axiosInstance.post('/assignments', data);
     return response.data?.assignment;
   },
@@ -32,9 +31,20 @@ export const assignmentsApi = {
     return response.data?.update;
   },
 
-  startRemediation: async (id) => {
-    const response = await axiosInstance.patch(`/assignments/${id}/start`);
-    return response.data?.assignment;
+  startRemediation: async (id, data = {}) => {
+    const payload = {
+      startDate: data.startDate || new Date().toISOString(),
+      description: data.description || data.notes || 'Remediation work begun on site.',
+      notes: data.notes || data.description || 'Remediation work begun on site.',
+      evidenceUrls: data.evidenceUrls || []
+    };
+    const response = await axiosInstance.patch(`/assignments/${id}/start`, payload);
+    return response.data?.assignment || response.data;
+  },
+
+  reportWorkDelay: async (id, data = {}) => {
+    const response = await axiosInstance.post(`/assignments/${id}/delay`, data);
+    return response.data;
   },
 
   addProgressUpdate: async (id, data = {}) => {
@@ -56,13 +66,14 @@ export const assignmentsApi = {
       ...data,
       description: data.description || data.completionNotes || data.notes || 'Work completed and submitted for verification.',
       completionNotes: data.completionNotes || data.description || 'Work completed and submitted for verification.',
+      materialsUsed: data.materialsUsed,
+      technicalDetails: data.technicalDetails,
       evidenceUrls,
       afterEvidenceUrls: evidenceUrls
     };
     const response = await axiosInstance.post(`/assignments/${id}/complete`, payload);
-    return response.data?.assignment;
+    return response.data?.assignment || response.data;
   },
 };
 
 export default assignmentsApi;
-

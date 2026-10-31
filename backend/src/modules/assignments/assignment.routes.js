@@ -5,7 +5,9 @@ import authorizeRole from '../../middlewares/authorizeRole.js';
 import validateRequest from '../../middlewares/validateRequest.js';
 import {
   createAssignmentSchema,
+  startWorkSchema,
   addWorkUpdateSchema,
+  reportDelaySchema,
   completeWorkSchema
 } from './assignment.validation.js';
 
@@ -25,9 +27,9 @@ router.get('/:id', assignmentController.getAssignmentById);
 // Worker workflow actions
 router.patch('/:id/accept', authorizeRole('FIELD_WORKER', 'SUPER_ADMIN', 'DEPARTMENT_OFFICER'), assignmentController.acceptAssignment);
 router.post('/:id/inspection', authorizeRole('FIELD_WORKER', 'SUPER_ADMIN', 'DEPARTMENT_OFFICER'), validateRequest(addWorkUpdateSchema), assignmentController.logInspection);
-router.patch('/:id/start', authorizeRole('FIELD_WORKER', 'SUPER_ADMIN', 'DEPARTMENT_OFFICER'), assignmentController.startRemediation);
+router.patch('/:id/start', authorizeRole('FIELD_WORKER', 'SUPER_ADMIN', 'DEPARTMENT_OFFICER'), validateRequest(startWorkSchema), assignmentController.startRemediation);
+router.post('/:id/delay', authorizeRole('FIELD_WORKER', 'SUPER_ADMIN', 'DEPARTMENT_OFFICER'), validateRequest(reportDelaySchema), assignmentController.reportWorkDelay);
 router.post('/:id/progress', authorizeRole('FIELD_WORKER', 'SUPER_ADMIN', 'DEPARTMENT_OFFICER'), validateRequest(addWorkUpdateSchema), assignmentController.addProgressUpdate);
 router.post('/:id/complete', authorizeRole('FIELD_WORKER', 'SUPER_ADMIN', 'DEPARTMENT_OFFICER'), validateRequest(completeWorkSchema), assignmentController.completeWork);
 
 export default router;
-

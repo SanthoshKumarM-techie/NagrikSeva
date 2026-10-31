@@ -244,7 +244,7 @@ export const ComplaintDetails = () => {
                   icon={AlertTriangle}
                   onClick={() => setDisputeModalOpen(true)}
                 >
-                  Dispute Resolution
+                  Reject & Request Rework
                 </Button>
                 <Button
                   variant="success"
@@ -387,6 +387,48 @@ export const ComplaintDetails = () => {
             </div>
           </div>
 
+          {/* Active Contractor On-Site Delay Notification */}
+          {(complaint.delayAlert || (complaint.delays && complaint.delays.length > 0)) && (
+            <div className="gov-card p-5 border-amber-300 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20">
+              <div className="flex items-start gap-3.5">
+                <div className="p-2 rounded-lg bg-amber-500 text-white shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="flex-1 space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <h4 className="font-bold text-amber-900 dark:text-amber-200 text-sm">
+                      Work Delay Notification: {complaint.delayAlert?.reason || complaint.delays?.[0]?.reason}
+                    </h4>
+                    <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 font-semibold">
+                      Revised Target: {formatDate(complaint.delayAlert?.estimatedCompletionDate || complaint.delays?.[0]?.estimatedCompletionDate)}
+                    </span>
+                  </div>
+                  <p className="text-amber-800 dark:text-amber-300 leading-relaxed bg-white/70 dark:bg-slate-900/70 p-2.5 rounded-lg border border-amber-200 dark:border-amber-900/50">
+                    <strong>Contractor Explanation:</strong> {complaint.delayAlert?.description || complaint.delays?.[0]?.description}
+                  </p>
+                  {((complaint.delayAlert?.evidenceUrls && complaint.delayAlert.evidenceUrls.length > 0) || (complaint.delays?.[0]?.evidenceUrls && complaint.delays[0].evidenceUrls.length > 0)) && (
+                    <div className="pt-1">
+                      <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block mb-1">
+                        Delay Site Obstacle Photos:
+                      </span>
+                      <div className="flex gap-2">
+                        {(complaint.delayAlert?.evidenceUrls || complaint.delays[0].evidenceUrls).map((url, idx) => (
+                          <img
+                            key={idx}
+                            src={getImageUrl(url)}
+                            alt={`Delay Evidence ${idx}`}
+                            onClick={() => setPhotoModalUrl(getImageUrl(url))}
+                            className="w-16 h-16 object-cover rounded-lg border border-amber-300 dark:border-amber-700 cursor-pointer hover:opacity-90"
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Inter-Department Transfer Banner if Transferred */}
           {complaint.transfers && complaint.transfers.length > 0 && (
             <div className="gov-card p-5 border-l-4 border-l-purple-600">
@@ -512,8 +554,8 @@ export const ComplaintDetails = () => {
       <Modal
         isOpen={disputeModalOpen}
         onClose={() => setDisputeModalOpen(false)}
-        title="Dispute Grievance Resolution"
-        description="If the civic issue was not fixed properly, filing a dispute automatically reopens the ticket and escalates to a senior supervisor."
+        title="Reject Remediation & Request Rework"
+        description="If the remediation on site is incomplete, defective, or unsatisfactory, describe the defect. The workflow will restart and return to the contractor & crew for on-site rework until you confirm and approve."
         footer={
           <>
             <Button variant="secondary" onClick={() => setDisputeModalOpen(false)} disabled={disputeLoading}>
@@ -533,10 +575,10 @@ export const ComplaintDetails = () => {
       >
         <div className="space-y-3">
           <Input
-            label="Reason for Dispute (min 10 characters)"
+            label="Defect Description / Rework Instructions (Mandatory, min 10 characters)"
             type="textarea"
             rows={4}
-            placeholder="Explain why the resolution is unsatisfactory (e.g. debris left behind, water still leaking, pothole patched improperly)..."
+            placeholder="Describe what is still defective on site (e.g. pothole surface remains unlevel, water pooling again, construction debris left behind)..."
             value={disputeReason}
             onChange={(e) => setDisputeReason(e.target.value)}
             enableVoice={true}

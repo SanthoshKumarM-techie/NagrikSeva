@@ -276,7 +276,35 @@ export const mapBackendComplaint = (c) => {
     assignedWorkerId: c.assigned_worker_id || c.assignedWorkerId || null,
     assignedWorkerName: c.assigned_worker_name || c.assignedWorkerName || null,
     assignmentId: c.assignment_id || c.assignmentId || null,
-    assignmentStatus: c.assignment_status || c.assignmentStatus || null
+    assignmentStatus: c.assignment_status || c.assignmentStatus || null,
+    workUpdates: (Array.isArray(c.work_updates) ? c.work_updates : []).map(wu => ({
+      id: wu.id,
+      updateType: wu.update_type,
+      description: wu.notes || wu.description,
+      materialsUsed: wu.materials_used,
+      technicalDetails: wu.technical_details,
+      createdAt: wu.created_at,
+      workerName: wu.worker_name,
+      workerCode: wu.worker_code
+    })),
+    delays: (Array.isArray(c.work_updates) ? c.work_updates : [])
+      .filter(wu => wu.update_type === 'DELAY')
+      .map(wu => {
+        let details = {};
+        try {
+          details = typeof wu.technical_details === 'string' ? JSON.parse(wu.technical_details) : (wu.technical_details || {});
+        } catch (e) {
+          details = {};
+        }
+        return {
+          id: wu.id,
+          reason: details.delayReason || 'Site Obstruction',
+          description: wu.notes || wu.description,
+          estimatedCompletionDate: details.estimatedCompletionDate,
+          reportedAt: wu.created_at,
+          workerName: wu.worker_name
+        };
+      })
   };
 };
 
@@ -993,6 +1021,81 @@ export const ComplaintProvider = ({ children }) => {
     return true;
   };
 
+  const reportWorkDelay = async (complaintId, { delayReason, description, estimatedCompletionDate, evidenceUrls }, workerUser, fallbackId = null) => {
+    const timestamp = new Date().toISOString();
+    const targetComp = complaints.find(c =>
+      c.id === complaintId ||
+      c.complaintId === complaintId ||
+      c.ticketNumber === complaintId ||
+      c.assignmentId === complaintId ||
+      (fallbackId && (c.id === fallbackId || c.ticketNumber === fallbackId || c.complaintId === fallbackId || c.assignmentId === fallbackId))
+    );
+    const targetAssignmentId = targetComp?.assignmentId || targetComp?.id || complaintId;
+
+    try {
+      await assignmentsApi.reportWorkDelay(targetAssignmentId, {
+        delayReason,
+        description,
+        estimatedCompletionDate,
+        evidenceUrls
+      });
+    } catch (err) {
+      console.warn('Backend report delay warning:', err.message);
+    }
+
+    setComplaints(prev => {
+      const updated = prev.map(c => {
+        const matches =
+          c.id === complaintId ||
+          c.complaintId === complaintId ||
+          c.assignmentId === complaintId ||
+          c.ticketNumber === complaintId ||
+          (fallbackId && (c.id === fallbackId || c.ticketNumber === fallbackId || c.complaintId === fallbackId || c.assignmentId === fallbackId));
+
+        if (matches) {
+          const delayObj = {
+            id: `del-${Date.now()}`,
+            reason: delayReason,
+            description,
+            estimatedCompletionDate,
+            evidenceUrls: evidenceUrls || [],
+            reportedAt: timestamp,
+            workerName: workerUser?.name || 'Contractor & Crew'
+          };
+          return {
+            ...c,
+            delays: [...(c.delays || []), delayObj],
+            delayAlert: delayObj,
+            timeline: [
+              ...(c.timeline || []),
+              {
+                id: `tl-${Date.now()}`,
+                status: c.status,
+                title: `Work Delay: ${delayReason}`,
+                description: `Reason: "${delayReason}" - ${description}. Revised Target Date: ${estimatedCompletionDate}.`,
+                timestamp,
+                author: workerUser?.name || 'Contractor & Crew',
+                role: 'Worker'
+              }
+            ]
+          };
+        }
+        return c;
+      });
+
+      setStorage(STORAGE_KEYS.COMPLAINTS, updated);
+      return updated;
+    });
+
+    addNotification({
+      title: 'Work Delay Logged',
+      message: `Delay reported for #${targetComp?.ticketNumber || complaintId}: ${delayReason}. Notifications sent to citizen, department, and super admin.`,
+      type: 'warning'
+    });
+
+    return true;
+  };
+
   const updateWorkerTaskStatus = async (complaintId, newStatus, notes, beforePhotos, afterPhotos, workerUser, fallbackId = null) => {
     const timestamp = new Date().toISOString();
 
@@ -1016,7 +1119,11 @@ export const ComplaintProvider = ({ children }) => {
           technicalDetails: {}
         });
       } else if (newStatus === COMPLAINT_STATUS.WORK_IN_PROGRESS) {
-        await assignmentsApi.startRemediation(targetAssignmentId);
+        await assignmentsApi.startRemediation(targetAssignmentId, {
+          startDate: (typeof notes === 'object' ? notes?.startDate : null) || new Date().toISOString(),
+          description: (typeof notes === 'object' ? notes?.description : notes) || 'Remediation work started on site.',
+          evidenceUrls: beforePhotos && beforePhotos.length > 0 ? beforePhotos.filter(Boolean) : []
+        });
       } else if (newStatus === COMPLAINT_STATUS.VERIFICATION) {
         const evidence = (afterPhotos && afterPhotos.length > 0)
           ? afterPhotos.filter(Boolean)
@@ -1475,6 +1582,7 @@ export const ComplaintProvider = ({ children }) => {
         assignWorker,
         acceptTask,
         updateWorkerTaskStatus,
+        reportWorkDelay,
         verifyResolution,
         citizenConfirmResolution,
         citizenDisputeResolution,

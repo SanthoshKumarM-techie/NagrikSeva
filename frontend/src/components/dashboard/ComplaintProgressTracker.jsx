@@ -163,6 +163,14 @@ export const ComplaintProgressTracker = ({ complaint, className = '' }) => {
             : 'Field crew is on-site conducting initial damage inspection and deploying safety barricades.'
         };
       case 4:
+        const isReworkOrder = complaint.assignmentStatus === 'REWORK_REQUIRED' || (complaint.timeline || []).some(t => String(t.title || '').toLowerCase().includes('rework'));
+        if (isReworkOrder) {
+          return {
+            bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-300 dark:border-rose-800 text-rose-900 dark:text-rose-200',
+            title: 'Remediation Rework in Progress (Citizen Ordered)',
+            desc: 'Citizen inspected the site and requested rework. Field crew is actively rectifying the defect on site before resubmitting for final approval.'
+          };
+        }
         return {
           bg: 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-300 dark:border-yellow-800 text-yellow-900 dark:text-yellow-200',
           title: 'Remediation Work in Progress',
