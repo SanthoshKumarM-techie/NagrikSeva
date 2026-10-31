@@ -27,6 +27,7 @@ import Input from '../../components/common/Input';
 import Modal from '../../components/common/Modal';
 import ComplaintTimeline from '../../components/dashboard/ComplaintTimeline';
 import ComplaintProgressTracker from '../../components/dashboard/ComplaintProgressTracker';
+import ContractorDispatchMap from '../../components/dashboard/ContractorDispatchMap';
 import { formatDate } from '../../utils/statusHelpers';
 
 import complaintsApi from '../../api/complaints.api';
@@ -335,6 +336,9 @@ export const TaskDetails = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Job Details & Evidence Submission Form */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Site Route & Google Maps Preview */}
+          <ContractorDispatchMap task={task} />
+
           {/* Work Order Info */}
           <div className="gov-card p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">

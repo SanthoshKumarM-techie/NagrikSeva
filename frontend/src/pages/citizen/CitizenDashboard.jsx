@@ -82,13 +82,25 @@ export const CitizenDashboard = () => {
 
   // Fast memoized citizen complaints filtering
   const myComplaints = useMemo(() => {
-    const list = myOwnComplaints.length > 0 ? myOwnComplaints : complaints;
+    // Merge complaints from context and local cache so newly created grievances appear immediately
+    const complaintMap = new Map();
+    (complaints || []).forEach(c => {
+      if (c && c.id) complaintMap.set(c.id, c);
+    });
+    (myOwnComplaints || []).forEach(c => {
+      if (c && c.id && !complaintMap.has(c.id)) {
+        complaintMap.set(c.id, c);
+      }
+    });
+    const list = Array.from(complaintMap.values());
     const userId = currentUser?.id;
     const userCode = currentUser?.userCode;
+    const userEmail = (currentUser?.email || '').toLowerCase().trim();
 
     const filtered = list.filter((c) => {
       const isOwner = (userId && (c.citizenId === userId || c.submitted_by === userId)) ||
                       (userCode && (c.citizenId === userCode || c.submitted_by === userCode)) ||
+                      (userEmail && c.citizenEmail && c.citizenEmail.toLowerCase().trim() === userEmail) ||
                       c.citizenId === 'CIT001' || c.citizenId === 'CIT-001';
       const isSupporter = Array.isArray(c.supporters) && (
         (userId && c.supporters.includes(userId)) ||
@@ -120,10 +132,10 @@ export const CitizenDashboard = () => {
     return { pendingComplaints: pending, inProgressComplaints: inProg, resolvedComplaints: resolved };
   }, [myComplaints]);
 
-  const statTotal = liveStats?.totalComplaints !== undefined ? liveStats.totalComplaints : myComplaints.length;
-  const statPending = liveStats?.pendingCount !== undefined ? liveStats.pendingCount : pendingComplaints.length;
-  const statInProgress = liveStats?.inProgressCount !== undefined ? liveStats.inProgressCount : inProgressComplaints.length;
-  const statResolved = liveStats?.resolvedCount !== undefined ? liveStats.resolvedCount : resolvedComplaints.length;
+  const statTotal = myComplaints.length > 0 ? myComplaints.length : (liveStats?.totalComplaints ?? 0);
+  const statPending = myComplaints.length > 0 ? pendingComplaints.length : (liveStats?.pendingCount ?? 0);
+  const statInProgress = myComplaints.length > 0 ? inProgressComplaints.length : (liveStats?.inProgressCount ?? 0);
+  const statResolved = myComplaints.length > 0 ? resolvedComplaints.length : (liveStats?.resolvedCount ?? 0);
 
   // Status distribution for Chart - instantly calculated and guaranteed non-empty
   const chartData = useMemo(() => {
@@ -250,7 +262,7 @@ export const CitizenDashboard = () => {
           >
             <div className="w-full h-[260px] min-h-[260px] relative">
               <ResponsiveContainer width="100%" height={260} minWidth={0} minHeight={260}>
-                <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                <PieChart key={chartData.map(d => `${d.name}:${d.value}`).join('-')} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                   <Pie
                     data={chartData}
                     cx="50%"
