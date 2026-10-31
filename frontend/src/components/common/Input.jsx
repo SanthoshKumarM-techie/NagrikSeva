@@ -13,6 +13,8 @@ export const Input = forwardRef(({
   helperText,
   icon: Icon,
   disabled = false,
+  readOnly = false,
+  autoComplete,
   required = false,
   className = '',
   rows = 3,
