@@ -43,8 +43,19 @@ export const complaintsApi = {
   },
 
   getCitizenStats: async () => {
-    const response = await axiosInstance.get('/complaints/stats/citizen');
-    return response.data?.stats || { totalComplaints: 0, pendingCount: 0, inProgressCount: 0, resolvedCount: 0 };
+    try {
+      const response = await axiosInstance.get('/complaints/stats/citizen');
+      const stats = response.data?.stats || {};
+      return {
+        totalComplaints: stats.totalComplaints ?? stats.total_filed ?? 0,
+        pendingCount: stats.pendingCount ?? stats.active_count ?? 0,
+        inProgressCount: stats.inProgressCount ?? stats.active_count ?? 0,
+        resolvedCount: stats.resolvedCount ?? stats.resolved_count ?? 0,
+        supportedCount: stats.supportedCount ?? stats.supported_count ?? 0
+      };
+    } catch {
+      return null;
+    }
   },
 
   getDepartmentStats: async () => {

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, forwardRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import { VoiceTextarea } from './VoiceTextarea.jsx';
 
-export const Input = ({
+export const Input = forwardRef(({
   label,
   id,
   type = 'text',
@@ -22,7 +22,7 @@ export const Input = ({
   enableVoice = false,
   onVoiceChange,
   ...props
-}) => {
+}, ref) => {
   const [internalShowPassword, setInternalShowPassword] = useState(false);
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
 
@@ -60,6 +60,7 @@ export const Input = ({
   };
 
   const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
+  const safeValue = value !== undefined && value !== null ? value : '';
 
   return (
     <div className={`w-full ${className}`}>
@@ -76,11 +77,13 @@ export const Input = ({
         )}
         {type === 'textarea' ? (
           <textarea
+            ref={ref}
             id={inputId}
             rows={rows}
-            value={value}
+            value={safeValue}
             onChange={onChange}
             disabled={disabled}
+            readOnly={readOnly}
             placeholder={placeholder}
             className={`block w-full rounded-lg border text-sm transition-colors duration-150 p-2.5 ${
               Icon ? 'pl-9' : ''
@@ -94,11 +97,14 @@ export const Input = ({
         ) : (
           <>
             <input
+              ref={ref}
               id={inputId}
               type={effectiveType}
-              value={value}
+              value={safeValue}
               onChange={onChange}
               disabled={disabled}
+              readOnly={readOnly}
+              autoComplete={autoComplete}
               placeholder={placeholder}
               className={`block w-full rounded-lg border text-sm transition-colors duration-150 h-10 px-3 ${
                 Icon ? 'pl-9' : ''
@@ -138,6 +144,8 @@ export const Input = ({
       ) : null}
     </div>
   );
-};
+});
+
+Input.displayName = 'Input';
 
 export default Input;

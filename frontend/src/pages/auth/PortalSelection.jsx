@@ -20,7 +20,7 @@ export const PortalSelection = () => {
     },
     {
       id: 'worker',
-      title: 'Field Worker Operations',
+      title: 'Contractor & Crew Operations',
       subtitle: 'Municipal Crew & Contractors',
       description: 'View assigned maintenance work orders, perform on-site photo inspections, log progress, and upload completion proofs.',
       icon: Wrench,
@@ -98,7 +98,7 @@ export const PortalSelection = () => {
             return (
               <div
                 key={portal.id}
-                onClick={() => navigate(portal.actionUrl)}
+                onClick={() => navigate(portal.actionUrl, { replace: true })}
                 className="gov-card p-6 flex flex-col justify-between hover:shadow-xl hover:-translate-y-1 transition-all duration-200 cursor-pointer border border-slate-200 dark:border-slate-800 group"
               >
                 <div>
