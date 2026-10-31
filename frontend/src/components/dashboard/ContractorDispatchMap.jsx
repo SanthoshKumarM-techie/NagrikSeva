@@ -20,16 +20,17 @@ import {
   Volume2,
   CheckCircle2,
   ShieldCheck,
-  Info
+  Info,
+  Car
 } from 'lucide-react';
 import Button from '../common/Button';
 
 /**
- * Uber / Red Taxi Styled Dispatch & Turn-by-Turn Navigation Map
+ * Official Google Maps Dispatch & Turn-by-Turn Navigation Console
  * Exclusively designed for Contractor & Crew Operations Gate.
  * 
- * Provides real-time field navigation, incident target beacon,
- * turn-by-turn guidance HUD, and direct GPS launch to citizen-reported coordinates.
+ * Powered by Google Maps with driving directions, real-time satellite / street views,
+ * Uber / Taxi-style Turn-by-Turn HUD, and direct Google Maps Navigation launch.
  */
 export const ContractorDispatchMap = ({
   task,
@@ -40,11 +41,10 @@ export const ContractorDispatchMap = ({
   height = 'h-[460px]'
 }) => {
   const [copied, setCopied] = useState(false);
-  const [mapStyle, setMapStyle] = useState('uber-dark'); // 'uber-dark', 'streets', 'satellite'
+  // View modes: 'google-route' (Google Maps Directions), 'google-satellite' (Google Maps Satellite), 'google-standard' (Google Maps Standard)
+  const [googleViewMode, setGoogleViewMode] = useState('google-route');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [audioPromptActive, setAudioPromptActive] = useState(false);
-  const [simulatedProgress, setSimulatedProgress] = useState(35); // 0 to 100 % along route
-  const [arrivedAtSite, setArrivedAtSite] = useState(false);
 
   // Active target task
   const activeTask = useMemo(() => {
@@ -55,7 +55,7 @@ export const ContractorDispatchMap = ({
     return tasks[0] || task;
   }, [mode, task, tasks, selectedTaskId]);
 
-  // Extract coordinates with realistic fallbacks
+  // Extract coordinates with realistic Bengaluru center fallbacks
   const targetLat = useMemo(() => {
     const lat = parseFloat(activeTask?.latitude ?? activeTask?.coordinates?.lat);
     return !isNaN(lat) && lat !== 0 ? lat : 12.9719;
@@ -66,9 +66,8 @@ export const ContractorDispatchMap = ({
     return !isNaN(lng) && lng !== 0 ? lng : 77.6412;
   }, [activeTask]);
 
-  // Simulated Crew Depot / Current Vehicle Location (approx 1.8km - 2.5km away)
+  // Simulated Contractor Crew Depot / Field Vehicle Location (approx 1.8km - 2.5km away)
   const crewCoords = useMemo(() => {
-    // Generate deterministic crew location offset based on task coordinates
     return {
       lat: Number((targetLat - 0.0135).toFixed(4)),
       lng: Number((targetLng - 0.0125).toFixed(4)),
@@ -77,7 +76,7 @@ export const ContractorDispatchMap = ({
     };
   }, [targetLat, targetLng]);
 
-  // Calculate distance between crew and incident site using Haversine formula
+  // Calculate distance using Haversine formula
   const distanceKm = useMemo(() => {
     const R = 6371; // Earth radius in km
     const dLat = ((targetLat - crewCoords.lat) * Math.PI) / 180;
@@ -92,34 +91,21 @@ export const ContractorDispatchMap = ({
     return dist > 0.1 ? dist.toFixed(1) : '0.4';
   }, [targetLat, targetLng, crewCoords]);
 
-  // Estimated driving time at city average speed ~24 km/h
+  // Estimated driving time at city response pace (~22 km/h)
   const etaMinutes = useMemo(() => {
     const d = parseFloat(distanceKm);
-    const mins = Math.max(3, Math.round((d / 22) * 60));
-    return mins;
+    return Math.max(3, Math.round((d / 22) * 60));
   }, [distanceKm]);
 
-  // Turn-by-Turn maneuver instructions based on location landmark
+  // Turn-by-turn guidance based on citizen landmark
   const turnInstruction = useMemo(() => {
     const landmark = activeTask?.landmark || activeTask?.location || 'Main 100 Feet Road';
     return {
-      direction: 'Right',
       distance: '250m',
       street: `Turn Right onto ${landmark}`,
-      subtext: 'Fastest Route • Normal Civic Traffic Flow'
+      subtext: 'Fastest Google Maps Route • Live Traffic Corridor'
     };
   }, [activeTask]);
-
-  // Simulate vehicle moving along corridor
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSimulatedProgress(prev => {
-        if (prev >= 95) return 20;
-        return prev + 1;
-      });
-    }, 1500);
-    return () => clearInterval(interval);
-  }, []);
 
   // Copy GPS Coordinates
   const handleCopyCoords = () => {
@@ -128,7 +114,7 @@ export const ContractorDispatchMap = ({
     setTimeout(() => setCopied(false), 2500);
   };
 
-  // Open Direct GPS Navigation (Google Maps deep link)
+  // Open Direct Turn-by-Turn GPS Navigation in Google Maps
   const handleOpenGpsNavigation = () => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`;
     window.open(url, '_blank', 'noopener,noreferrer');
@@ -140,26 +126,40 @@ export const ContractorDispatchMap = ({
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  // Toggle voice navigation simulation
+  // Voice Navigation Guidance (Web Speech API)
   const handleToggleVoice = () => {
     setAudioPromptActive(prev => !prev);
     if (!audioPromptActive && 'speechSynthesis' in window) {
       const msg = new SpeechSynthesisUtterance(
-        `CivicLens Navigation: In 250 meters, turn right towards ${activeTask?.location || 'the incident site'}. Estimated arrival in ${etaMinutes} minutes.`
+        `Google Maps Navigation: In 250 meters, turn right towards ${activeTask?.location || 'the incident site'}. Distance ${distanceKm} kilometers, estimated arrival in ${etaMinutes} minutes.`
       );
       msg.rate = 1.0;
       window.speechSynthesis.speak(msg);
     }
   };
 
-  // Generate OpenStreetMap bounding box
-  const bbox = useMemo(() => {
-    const minLat = Math.min(crewCoords.lat, targetLat) - 0.008;
-    const maxLat = Math.max(crewCoords.lat, targetLat) + 0.008;
-    const minLng = Math.min(crewCoords.lng, targetLng) - 0.008;
-    const maxLng = Math.max(crewCoords.lng, targetLng) + 0.008;
-    return `${minLng.toFixed(4)}%2C${minLat.toFixed(4)}%2C${maxLng.toFixed(4)}%2C${maxLat.toFixed(4)}`;
-  }, [crewCoords, targetLat, targetLng]);
+  // Build the Google Maps Embed URL
+  const googleMapsEmbedUrl = useMemo(() => {
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+    if (apiKey) {
+      // Official Google Maps Embed API v1 with solution attribution tracking
+      if (googleViewMode === 'google-route') {
+        return `https://www.google.com/maps/embed/v1/directions?key=${apiKey}&origin=${crewCoords.lat},${crewCoords.lng}&destination=${targetLat},${targetLng}&mode=driving&solution_id=gmp_git_agentskills_v1`;
+      }
+      return `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${targetLat},${targetLng}&maptype=${googleViewMode === 'google-satellite' ? 'satellite' : 'roadmap'}&solution_id=gmp_git_agentskills_v1`;
+    }
+
+    // Universal Google Maps Embed (No API key required - Zero configuration)
+    if (googleViewMode === 'google-route') {
+      return `https://maps.google.com/maps?saddr=${crewCoords.lat},${crewCoords.lng}&daddr=${targetLat},${targetLng}&hl=en&z=14&output=embed`;
+    }
+    if (googleViewMode === 'google-satellite') {
+      return `https://maps.google.com/maps?q=${targetLat},${targetLng}&t=k&hl=en&z=17&output=embed`;
+    }
+    // google-standard roadmap
+    return `https://maps.google.com/maps?q=${targetLat},${targetLng}&t=m&hl=en&z=16&output=embed`;
+  }, [googleViewMode, targetLat, targetLng, crewCoords]);
 
   return (
     <div
@@ -171,7 +171,7 @@ export const ContractorDispatchMap = ({
       <div className="absolute top-0 inset-x-0 z-20 bg-gradient-to-b from-slate-950/95 via-slate-950/80 to-transparent p-3 sm:p-4 pointer-events-none">
         <div className="flex items-center justify-between gap-3 pointer-events-auto">
           {/* Turn-by-Turn Card */}
-          <div className="flex items-center gap-3 bg-slate-900/90 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-emerald-500/30 shadow-lg shadow-emerald-950/20 max-w-md">
+          <div className="flex items-center gap-3 bg-slate-900/95 backdrop-blur-md px-3.5 py-2.5 rounded-xl border border-emerald-500/30 shadow-lg shadow-emerald-950/20 max-w-md">
             <div className="w-10 h-10 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/30 animate-pulse">
               <CornerUpRight className="w-6 h-6 stroke-[2.5]" />
             </div>
@@ -181,7 +181,7 @@ export const ContractorDispatchMap = ({
                   {turnInstruction.distance}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-400">&bull;</span>
-                <span className="text-[11px] font-medium text-slate-300">
+                <span className="text-[11px] font-medium text-slate-200">
                   {turnInstruction.street}
                 </span>
               </div>
@@ -200,9 +200,53 @@ export const ContractorDispatchMap = ({
                 <span>{etaMinutes} min</span>
                 <span className="text-slate-400 font-normal">({distanceKm} km)</span>
               </div>
-              <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">
-                Fastest Response
+              <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                Google Fast Route
               </span>
+            </div>
+
+            {/* Google Maps Layer Switcher */}
+            <div className="flex items-center bg-slate-900/90 backdrop-blur-md p-1 rounded-xl border border-slate-700/60 shadow">
+              <button
+                type="button"
+                onClick={() => setGoogleViewMode('google-route')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 ${
+                  googleViewMode === 'google-route'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Google Maps Driving Route"
+              >
+                <Car className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Route</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGoogleViewMode('google-standard')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 ${
+                  googleViewMode === 'google-standard'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Google Maps Standard View"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Map</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGoogleViewMode('google-satellite')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 ${
+                  googleViewMode === 'google-satellite'
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Google Maps Satellite Recon"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Satellite</span>
+              </button>
             </div>
 
             {/* Audio Voice Guidance Toggle */}
@@ -219,16 +263,6 @@ export const ContractorDispatchMap = ({
               <Volume2 className="w-4 h-4" />
             </button>
 
-            {/* Map Style Switcher */}
-            <button
-              type="button"
-              onClick={() => setMapStyle(prev => prev === 'uber-dark' ? 'streets' : 'uber-dark')}
-              title="Toggle Map Style"
-              className="p-2 rounded-xl bg-slate-900/90 backdrop-blur-md border border-slate-700/60 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
-            >
-              <Layers className="w-4 h-4" />
-            </button>
-
             {/* Fullscreen Expand */}
             <button
               type="button"
@@ -242,123 +276,29 @@ export const ContractorDispatchMap = ({
         </div>
       </div>
 
-      {/* 2. REAL INTERACTIVE OPENSTREETMAP CANVAS */}
+      {/* 2. REAL GOOGLE MAPS EMBED */}
       <div className="w-full h-full relative overflow-hidden select-none">
         <iframe
-          title="Contractor Dispatch Live Map"
-          className={`w-full h-full border-0 transition-opacity duration-500 ${
-            mapStyle === 'uber-dark' ? 'invert-[0.93] hue-rotate-180 brightness-95 contrast-125' : 'opacity-100'
-          }`}
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${targetLat}%2C${targetLng}`}
+          title="Google Maps Contractor Dispatch"
+          className="w-full h-full border-0"
+          src={googleMapsEmbedUrl}
           loading="lazy"
+          allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
         />
 
-        {/* 3. UBER NAVIGATION OVERLAY (Route Corridor, Beacons & Waypoints) */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* SVG Animated Route Line */}
-          <svg className="w-full h-full">
-            <defs>
-              <linearGradient id="routeGradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#10B981" stopOpacity="0.9" />
-                <stop offset="50%" stopColor="#3B82F6" stopOpacity="0.9" />
-                <stop offset="100%" stopColor="#EF4444" stopOpacity="1" />
-              </linearGradient>
-              <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
-                <feGaussianBlur stdDeviation="3" result="blur" />
-                <feMerge>
-                  <feMergeNode in="blur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-
-            {/* Simulated Dynamic Route Corridor */}
-            <path
-              d="M 180 340 Q 260 280, 340 220 T 520 160"
-              fill="none"
-              stroke="#047857"
-              strokeWidth="8"
-              strokeLinecap="round"
-              opacity="0.5"
-            />
-            <path
-              d="M 180 340 Q 260 280, 340 220 T 520 160"
-              fill="none"
-              stroke="url(#routeGradient)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray="6 6"
-              filter="url(#neonGlow)"
-              className="animate-pulse"
-            />
-          </svg>
-
-          {/* CREW VEHICLE PIN (Simulated Dispatch Truck) */}
-          <div
-            className="absolute transition-all duration-1000 ease-linear pointer-events-auto cursor-pointer"
-            style={{
-              bottom: '28%',
-              left: '26%'
-            }}
-          >
-            <div className="relative group">
-              {/* Ripple ping */}
-              <div className="absolute -inset-2 rounded-full bg-emerald-500/40 animate-ping"></div>
-
-              {/* Vehicle Badge */}
-              <div className="relative flex items-center justify-center w-10 h-10 rounded-full bg-slate-900 border-2 border-emerald-400 text-emerald-400 shadow-xl shadow-emerald-500/30">
-                <Truck className="w-5 h-5" />
-              </div>
-
-              {/* Tooltip */}
-              <div className="absolute bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900/95 text-white text-[11px] font-bold px-2.5 py-1 rounded-md border border-slate-700 shadow-lg opacity-90 group-hover:opacity-100 transition-opacity">
-                <span>{crewCoords.label} &bull; {crewCoords.speed}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* CITIZEN INCIDENT TARGET PIN */}
-          <div
-            className="absolute pointer-events-auto cursor-pointer"
-            style={{
-              top: '35%',
-              right: '34%'
-            }}
-          >
-            <div className="relative group">
-              {/* Radar beacon waves */}
-              <div className="absolute -inset-4 rounded-full bg-rose-500/30 animate-ping duration-1000"></div>
-              <div className="absolute -inset-8 rounded-full bg-rose-500/10 animate-pulse"></div>
-
-              {/* Incident Marker Pin */}
-              <div className="relative flex items-center justify-center w-11 h-11 rounded-full bg-rose-600 border-2 border-white text-white shadow-2xl shadow-rose-600/50 transform -translate-y-2 hover:scale-110 transition-transform">
-                <MapPin className="w-6 h-6 fill-white text-rose-600" />
-              </div>
-
-              {/* Incident Floating Pill */}
-              <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-950/95 text-white text-xs px-3 py-1.5 rounded-lg border border-rose-500/50 shadow-2xl">
-                <div className="flex items-center gap-1.5 font-bold text-rose-400">
-                  <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-                  <span>{activeTask?.ticketNumber || activeTask?.id || 'Grievance Site'}</span>
-                </div>
-                <div className="text-[11px] text-slate-300 font-medium max-w-[200px] truncate">
-                  {activeTask?.title || 'Reported Citizen Issue'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Dispatch Navigation Compass (Top Left under HUD) */}
-          <div className="absolute top-20 left-4 hidden md:flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-800 text-[11px] text-slate-300 font-mono shadow">
-            <Compass className="w-3.5 h-3.5 text-blue-400 animate-spin-slow" />
-            <span>HEADING: 042&deg; NE</span>
-            <span className="text-slate-600">|</span>
-            <span className="text-emerald-400">GPS LOCK &plusmn;3m</span>
-          </div>
+        {/* 3. GOOGLE MAPS LIVE WATERMARK & TELEMETRY BADGE */}
+        <div className="absolute top-20 left-4 hidden md:flex items-center gap-2 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-slate-800 text-[11px] text-slate-300 font-mono shadow-xl pointer-events-none">
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="font-semibold text-white">Google Maps Live</span>
+          <span className="text-slate-600">|</span>
+          <span>HEADING: 042&deg; NE</span>
+          <span className="text-slate-600">|</span>
+          <span className="text-emerald-400">GPS &plusmn;3m</span>
         </div>
       </div>
 
-      {/* 4. DRIVER DISPATCH CONSOLE FOOTER (UBER / RED TAXI STYLE) */}
+      {/* 4. DRIVER DISPATCH CONSOLE FOOTER (UBER / GOOGLE MAPS STYLE) */}
       <div className="absolute bottom-0 inset-x-0 z-20 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent p-3 sm:p-4">
         <div className="bg-slate-900/95 backdrop-blur-md rounded-xl p-3 sm:p-4 border border-slate-800 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-3">
           {/* Site Location & Citizen Details */}
@@ -428,14 +368,14 @@ export const ContractorDispatchMap = ({
               <span>Street View</span>
             </button>
 
-            {/* Primary Action: Turn-by-Turn GPS Launch (Uber / Google Maps) */}
+            {/* Primary Action: Turn-by-Turn GPS Launch (Google Maps App) */}
             <button
               type="button"
               onClick={handleOpenGpsNavigation}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-950/40 border border-emerald-400/40 transition-all hover:scale-[1.02]"
             >
               <Navigation className="w-4 h-4 fill-white" />
-              <span>Start Turn-by-Turn GPS</span>
+              <span>Start Google Maps GPS</span>
             </button>
           </div>
         </div>
