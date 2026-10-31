@@ -133,7 +133,7 @@ export const ComplaintReview = () => {
   // Handle Worker Assignment
   const handleAssignSubmit = async () => {
     if (!selectedWorkerId) {
-      alert('Please select a field worker.');
+      alert('Please select a contractor or crew member.');
       return;
     }
     const worker = workers.find(w => w.id === selectedWorkerId);
@@ -148,7 +148,7 @@ export const ComplaintReview = () => {
         {
           id: `tl-${Date.now()}`,
           status: COMPLAINT_STATUS.WORKER_ASSIGNED,
-          title: `Field Worker Assigned: ${worker?.name || 'Field Crew'}`,
+          title: `Contractor & Crew Assigned: ${worker?.name || 'Contractor Crew'}`,
           description: assignmentNotes || `Assigned to ${worker?.name || 'specialist'}.`,
           timestamp: new Date().toISOString(),
           author: currentUser?.name || 'Department Officer',
@@ -509,7 +509,7 @@ export const ComplaintReview = () => {
                   setAssignModalOpen(true);
                 }}
               >
-                {complaint.assignedWorkerId ? 'Reassign Field Worker' : 'Assign Field Worker'}
+                {complaint.assignedWorkerId ? 'Reassign Contractor & Crew' : 'Assign Contractor & Crew'}
               </Button>
 
               {isPendingVerification && (
@@ -596,7 +596,7 @@ export const ComplaintReview = () => {
       <Modal
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
-        title={complaint.assignedWorkerId ? "Reassign Field Worker / Crew Reorder" : "Assign Field Worker / Contractor Crew"}
+        title={complaint.assignedWorkerId ? "Reassign Contractor & Crew / Reorder" : "Assign Contractor & Crew"}
         description={complaint.assignedWorkerId ? "Reallocate this work order or assign a different specialist to remediate the civic issue." : "Deploy on-ground staff to conduct site inspection and commence remediation."}
         footer={
           <>

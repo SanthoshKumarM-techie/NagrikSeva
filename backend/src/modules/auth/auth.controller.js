@@ -5,12 +5,14 @@ import asyncHandler from '../../utils/asyncHandler.js';
 export const login = asyncHandler(async (req, res) => {
   const identifier = req.body.email || req.body.userId || req.body.userCode || req.body.identifier;
   const password = req.body.password;
+  const expectedRole = req.body.expectedRole || req.body.portal;
   const ipAddress = req.ip || req.connection.remoteAddress;
   const userAgent = req.get('user-agent');
 
   const user = await authService.login({
     email: identifier,
     password,
+    expectedRole,
     session: req.session,
     ipAddress,
     userAgent

@@ -1,7 +1,7 @@
 export const ROLES = {
   CITIZEN: 'Citizen',
   OFFICER: 'Department Officer',
-  WORKER: 'Field Worker',
+  WORKER: 'Contractor & Crew Operations',
   ADMIN: 'Super Admin',
 };
 

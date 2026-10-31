@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ROLES, DEMO_CREDENTIALS, STORAGE_KEYS } from '../utils/constants';
+import { formatUserCode, checkRoleMatchesExpected } from '../utils/userHelpers';
 import { getStorage, setStorage, removeStorage } from '../utils/storage';
 import authApi from '../api/auth.api';
 
@@ -12,16 +13,18 @@ export const mapBackendUser = (user) => {
 
   if (rawRole === 'DEPARTMENT_OFFICER' || user.role === ROLES.OFFICER) {
     displayRole = ROLES.OFFICER;
-  } else if (rawRole === 'FIELD_WORKER' || user.role === ROLES.WORKER) {
+  } else if (rawRole === 'FIELD_WORKER' || user.role === 'Field Worker' || user.role === ROLES.WORKER || user.role === 'Contractor & Crew Operations') {
     displayRole = ROLES.WORKER;
   } else if (rawRole === 'SUPER_ADMIN' || user.role === ROLES.ADMIN) {
     displayRole = ROLES.ADMIN;
   }
 
+  const resolvedCode = formatUserCode(user, displayRole);
+
   return {
     ...user,
     id: user.id,
-    userCode: user.userCode || user.user_code,
+    userCode: resolvedCode,
     name: user.fullName || user.full_name || user.name || 'User',
     email: user.email,
     phone: user.phoneNumber || user.phone || '+91 98765 43210',
@@ -86,7 +89,7 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, [restoreSession]);
 
-  const login = async (userId, password) => {
+  const login = async (userId, password, expectedRole) => {
     setLoading(true);
     setError(null);
 
@@ -101,10 +104,25 @@ export const AuthProvider = ({ children }) => {
         email: userId.includes('@') ? userId.trim() : undefined,
         userId: !userId.includes('@') ? userId.trim() : undefined,
         password: effectivePassword,
+        expectedRole: expectedRole || undefined
       };
 
       const backendUser = await authApi.login(payload);
       const userObj = mapBackendUser(backendUser);
+
+      // Strict role categorization: ensure user's actual role matches the requested portal gate
+      if (expectedRole) {
+        const isMatch = checkRoleMatchesExpected(userObj.role, userObj.rawRole, expectedRole);
+        if (!isMatch) {
+          await authApi.logout().catch(() => {});
+          setCurrentUser(null);
+          removeStorage(STORAGE_KEYS.AUTH_USER);
+          setLoading(false);
+          const errMsg = `Access Denied: This account is categorized as '${userObj.role}'. Only ${expectedRole} login credentials are accepted at this gate.`;
+          setError(errMsg);
+          return { success: false, error: errMsg };
+        }
+      }
 
       setCurrentUser(userObj);
       setStorage(STORAGE_KEYS.AUTH_USER, userObj);
@@ -112,7 +130,7 @@ export const AuthProvider = ({ children }) => {
       return { success: true, user: userObj };
     } catch (err) {
       setLoading(false);
-      const errMsg = err?.message || 'Invalid User ID or Password.';
+      const errMsg = err?.response?.data?.message || err?.message || 'Invalid User ID or Password.';
       setError(errMsg);
       return { success: false, error: errMsg };
     }
@@ -154,6 +172,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setCurrentUser(null);
       removeStorage(STORAGE_KEYS.AUTH_USER);
+      try { sessionStorage.clear(); } catch (_) {}
     }
   };
 

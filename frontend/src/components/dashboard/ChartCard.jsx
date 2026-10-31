@@ -24,7 +24,7 @@ export const ChartCard = ({
         {action && <div>{action}</div>}
       </div>
 
-      <div className="w-full flex-1 flex items-center justify-center" style={{ minHeight }}>
+      <div className="w-full min-w-0 flex-1 flex items-center justify-center relative" style={{ minHeight }}>
         {children}
       </div>
     </div>
