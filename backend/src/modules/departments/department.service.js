@@ -5,6 +5,19 @@ import mailService from '../../services/mail.service.js';
 import bcrypt from 'bcrypt';
 import db from '../../config/database.js';
 
+export const getNextOfficerCode = async () => {
+  const codeQuery = `SELECT user_code FROM users WHERE user_code LIKE 'OFF%' ORDER BY LENGTH(user_code) DESC, user_code DESC LIMIT 1;`;
+  const codeRes = await db.query(codeQuery);
+  let nextNum = 1;
+  if (codeRes.rows.length > 0 && codeRes.rows[0].user_code) {
+    const match = codeRes.rows[0].user_code.match(/\d+/);
+    if (match) {
+      nextNum = parseInt(match[0], 10) + 1;
+    }
+  }
+  return `OFF${String(nextNum).padStart(3, '0')}`;
+};
+
 export const listDepartments = async ({ isActive, search } = {}) => {
   return await departmentRepository.findAll({ isActive, search });
 };
@@ -67,16 +80,7 @@ export const createDepartment = async (data, adminId, clientInfo = {}) => {
 
   try {
     // Generate sequential user code for the department officer (e.g. OFF001, OFF002, OFF003)
-    const codeQuery = `SELECT user_code FROM users WHERE user_code LIKE 'OFF%' ORDER BY user_code DESC LIMIT 1;`;
-    const codeRes = await db.query(codeQuery);
-    let nextNum = 3;
-    if (codeRes.rows.length > 0 && codeRes.rows[0].user_code) {
-      const match = codeRes.rows[0].user_code.match(/\d+/);
-      if (match) {
-        nextNum = parseInt(match[0], 10) + 1;
-      }
-    }
-    const officerUserCode = `OFF${String(nextNum).padStart(3, '0')}`;
+    const officerUserCode = await getNextOfficerCode();
     const passwordHash = await bcrypt.hash(initialPassword, 10);
 
     // Check if user already exists with this email

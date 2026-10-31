@@ -6,7 +6,8 @@ export const listDepartments = asyncHandler(async (req, res) => {
   const isActive = req.query.isActive !== undefined ? req.query.isActive === 'true' : undefined;
   const search = req.query.search;
   const departments = await departmentService.listDepartments({ isActive, search });
-  return ApiResponse.success(res, 200, { departments }, 'Departments retrieved successfully');
+  const nextOfficerCode = await departmentService.getNextOfficerCode();
+  return ApiResponse.success(res, 200, { departments, nextOfficerCode }, 'Departments retrieved successfully');
 });
 
 export const getDepartmentById = asyncHandler(async (req, res) => {

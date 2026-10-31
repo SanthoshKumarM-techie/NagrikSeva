@@ -24,7 +24,7 @@ import Modal from '../../components/common/Modal';
 import Input from '../../components/common/Input';
 
 export const Departments = () => {
-  const { departments, complaints, addDepartment, updateDepartment } = useComplaints();
+  const { departments, complaints, addDepartment, updateDepartment, users } = useComplaints();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
@@ -36,6 +36,23 @@ export const Departments = () => {
   const [credentialsModalOpen, setCredentialsModalOpen] = useState(false);
   const [createdOfficer, setCreatedOfficer] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  // Dynamically compute the next sequential Officer User ID
+  const nextOfficerId = React.useMemo(() => {
+    const officerCodes = (users || [])
+      .map(u => u.user_code || u.id || '')
+      .filter(id => typeof id === 'string' && id.toUpperCase().startsWith('OFF'));
+    
+    let highestNum = 2; // Baseline from seed OFF001, OFF002
+    for (const code of officerCodes) {
+      const match = code.match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (num > highestNum) highestNum = num;
+      }
+    }
+    return `OFF${String(highestNum + 1).padStart(3, '0')}`;
+  }, [users]);
 
   const [formData, setFormData] = useState({
     name: '',
