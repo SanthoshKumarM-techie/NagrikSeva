@@ -12,7 +12,9 @@ export const ConfirmDialog = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   type = 'warning', // warning | danger | info | success
-  loading = false
+  loading = false,
+  size = 'sm',
+  children
 }) => {
   const getIcon = () => {
     switch (type) {
@@ -38,7 +40,7 @@ export const ConfirmDialog = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="sm"
+      size={size}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={loading}>
@@ -58,9 +60,16 @@ export const ConfirmDialog = ({
           <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-1">
             {title}
           </h4>
-          <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-            {message}
-          </p>
+          {message && (
+            <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              {message}
+            </p>
+          )}
+          {children && (
+            <div className="mt-3">
+              {children}
+            </div>
+          )}
         </div>
       </div>
     </Modal>
@@ -68,4 +77,3 @@ export const ConfirmDialog = ({
 };
 
 export default ConfirmDialog;
-

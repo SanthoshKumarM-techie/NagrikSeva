@@ -261,7 +261,9 @@ export const mapBackendComplaint = (c) => {
     assignedWorkerId: c.assigned_worker_id || c.assignedWorkerId || null,
     assignedWorkerName: c.assigned_worker_name || c.assignedWorkerName || null,
     assignmentId: c.assignment_id || c.assignmentId || null,
-    assignmentStatus: c.assignment_status || c.assignmentStatus || null
+    assignmentStatus: c.assignment_status || c.assignmentStatus || null,
+    citizenRating: c.citizen_rating || c.citizenRating || null,
+    citizenFeedback: c.citizen_feedback || c.citizenFeedback || null
   };
 };
 
@@ -1121,17 +1123,20 @@ export const ComplaintProvider = ({ children }) => {
     }, 400);
   };
 
-  const citizenConfirmResolution = async (complaintId, citizenUser, fallbackId = null) => {
+  const citizenConfirmResolution = async (complaintId, citizenUser, fallbackId = null, feedbackData = {}) => {
     const targetComp = complaints.find(
       c => c.id === complaintId || c.complaintId === complaintId || c.ticketNumber === complaintId || (fallbackId && (c.id === fallbackId || c.ticketNumber === fallbackId))
     );
     const dbComplaintId = targetComp?.id || complaintId;
 
+    const rating = Number.isInteger(feedbackData.rating) ? feedbackData.rating : 5;
+    const feedback = (feedbackData.feedback || '').trim() || 'Resolution confirmed by citizen. Case resolved satisfactorily.';
+
     try {
       await reviewsApi.citizenFeedback(dbComplaintId, {
         decision: 'CONFIRMED',
-        rating: 5,
-        feedback: 'Resolution confirmed by citizen. Case resolved satisfactorily.'
+        rating,
+        feedback
       });
     } catch (err) {
       console.warn('Backend citizen feedback API warning:', err.message);
@@ -1153,13 +1158,15 @@ export const ComplaintProvider = ({ children }) => {
             ...c,
             status: COMPLAINT_STATUS.CLOSED,
             current_status: 'CLOSED',
+            citizenRating: rating,
+            citizenFeedback: feedback,
             timeline: [
               ...(c.timeline || []),
               {
                 id: `tl-${Date.now()}`,
                 status: COMPLAINT_STATUS.CLOSED,
                 title: 'Citizen Confirmed Resolution — Case Closed',
-                description: `${citizenUser?.name || 'Citizen'} verified civic restoration and closed grievance.`,
+                description: `${citizenUser?.name || 'Citizen'} verified civic restoration (Rated: ${rating}/5 ⭐). ${feedback ? `Feedback: "${feedback}"` : ''}`.trim(),
                 timestamp,
                 author: citizenUser?.name || 'Citizen',
                 role: 'Citizen'
