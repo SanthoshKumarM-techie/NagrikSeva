@@ -12,42 +12,41 @@ export const initiateTransfer = async (officerUser, { complaintId, toDepartmentI
     throw ApiError.notFound('Complaint not found');
   }
 
-  // Officer must belong to complaint's current department unless SUPER_ADMIN
-  if (officerUser.role !== 'SUPER_ADMIN' && complaint.department_id !== officerUser.departmentId) {
+  // Officer must belong to complaint's current department unless SUPER_ADMIN or general assignment
+  if (officerUser.role !== 'SUPER_ADMIN' && officerUser.departmentId && complaint.department_id && complaint.department_id !== officerUser.departmentId) {
     throw ApiError.forbidden('You can only transfer complaints belonging to your department');
   }
 
-  if (toDepartmentId && complaint.department_id === toDepartmentId) {
+  const cleanToDeptId = toDepartmentId && String(toDepartmentId).trim() !== '' ? toDepartmentId : null;
+  if (cleanToDeptId && complaint.department_id === cleanToDeptId) {
     throw ApiError.badRequest('Target department must be different from current department');
   }
 
   let targetDept = null;
-  if (toDepartmentId) {
-    targetDept = await departmentRepository.findById(toDepartmentId);
-    if (!targetDept) {
-      throw ApiError.badRequest('Target department does not exist');
-    }
+  if (cleanToDeptId) {
+    targetDept = await departmentRepository.findById(cleanToDeptId);
   }
 
   const fromDepartmentId = complaint.department_id;
   const fromStatus = complaint.current_status || complaint.status;
+  const realComplaintId = complaint.id;
 
   return await db.withTransaction(async (client) => {
     // 1. Create transfer record with PENDING decision
     const transfer = await transferRepository.createTransfer({
-      complaintId,
+      complaintId: realComplaintId,
       fromDepartmentId,
-      toDepartmentId: toDepartmentId || null,
+      toDepartmentId: cleanToDeptId || null,
       initiatedBy: officerUser.id,
       reason
     }, client);
 
     // 2. Update complaint status to TRANSFERRED
-    await complaintRepository.updateStatus(complaintId, 'TRANSFERRED', client);
+    await complaintRepository.updateStatus(realComplaintId, 'TRANSFERRED', client);
 
     // 3. Status history
     await complaintRepository.addStatusHistory({
-      complaintId,
+      complaintId: realComplaintId,
       fromStatus,
       toStatus: 'TRANSFERRED',
       changedBy: officerUser.id,
@@ -59,7 +58,7 @@ export const initiateTransfer = async (officerUser, { complaintId, toDepartmentI
     // 4. Notify citizen
     notificationService.notifyUser({
       userId: complaint.citizen_id,
-      complaintId,
+      complaintId: realComplaintId,
       title: 'Complaint Transfer Requested',
       message: `Your complaint #${complaint.ticket_number} is under administrative transfer review to ensure it reaches the correct department.`,
       notificationType: 'STATUS_UPDATED'
@@ -71,7 +70,7 @@ export const initiateTransfer = async (officerUser, { complaintId, toDepartmentI
       action: 'INITIATE_TRANSFER_REQUEST',
       entityType: 'TRANSFER',
       entityId: transfer.id,
-      details: { complaintId, fromDepartmentId, toDepartmentId, reason },
+      details: { complaintId: realComplaintId, fromDepartmentId, toDepartmentId: cleanToDeptId, reason },
       ipAddress: clientInfo.ip,
       userAgent: clientInfo.userAgent
     }).catch(console.error);

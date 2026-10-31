@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const initiateTransferSchema = z.object({
   body: z.object({
-    complaintId: z.string().uuid('Valid Complaint ID is required'),
-    toDepartmentId: z.string().uuid('Valid Target Department ID').optional().nullable(),
-    reason: z.string().min(10, 'Transfer reason must be at least 10 characters')
+    complaintId: z.string().min(1, 'Valid Complaint ID is required'),
+    toDepartmentId: z.string().optional().nullable().or(z.literal('')),
+    reason: z.string().min(3, 'Transfer reason is required')
   })
 });
 

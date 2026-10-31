@@ -28,7 +28,8 @@ export const ComplaintProgressTracker = ({ complaint, className = '' }) => {
   // Stage rank helper
   const getStatusRank = (status) => {
     const s = String(status || '').toUpperCase();
-    if (s === 'CLOSED' || s === 'RESOLVED') return 6;
+    if (s === 'CLOSED') return 6;
+    if (s === 'RESOLVED') return 5.5;
     if (s === 'VERIFICATION') return 5;
     if (s === 'WORK_IN_PROGRESS' || s.includes('PROGRESS')) return 4;
     if (s === 'INSPECTION' || s.includes('INSPECT')) return 3;
@@ -110,15 +111,13 @@ export const ComplaintProgressTracker = ({ complaint, className = '' }) => {
     {
       id: 'resolved',
       stepNum: 5,
-      title: currentRank >= 6 ? 'Resolved & Closed' : 'Verified & Resolved',
-      shortTitle: 'Resolved',
+      title: currentRank >= 6 ? 'Confirmed & Closed' : (currentRank === 5.5 ? 'Resolved (Awaiting Citizen Approval)' : 'Verification & Closure'),
+      shortTitle: currentRank >= 6 ? 'Closed' : (currentRank === 5.5 ? 'Awaiting Approval' : 'Verification'),
       icon: ShieldCheck,
       stageRank: 5,
       timestamp: resolvedEvent?.timestamp || complaint.resolvedAt,
-      detail: currentRank >= 6
-        ? 'Remediation confirmed'
-        : (currentRank === 5 ? 'Pending officer sign-off' : 'Final stage'),
-      note: resolvedEvent?.description || (currentRank >= 6 ? 'Remediation verified by citizen and department' : 'Verification upon work completion')
+      detail: currentRank >= 6 ? 'Confirmed by Citizen/Supporters & Closed' : (currentRank === 5.5 ? 'Department resolved — Citizen confirmation needed' : 'Pending verification sign-off'),
+      note: resolvedEvent?.description || (currentRank >= 6 ? 'Remediation approved by citizen/supporters & closed' : 'Citizen or supporter approval required before closure')
     }
   ];
 
@@ -177,11 +176,17 @@ export const ComplaintProgressTracker = ({ complaint, className = '' }) => {
           title: 'Remediation Completed — Verification Pending',
           desc: 'Field crew has concluded repairs. Before and after photo proof is submitted for Department Officer sign-off.'
         };
+      case 5.5:
+        return {
+          bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200',
+          title: 'Resolved by Department — Citizen / Supporter Approval Required',
+          desc: 'The department has verified the remediation and marked the grievance as Resolved. Before this complaint can be closed, the citizen who raised it or any registered supporters must confirm and approve the work.'
+        };
       case 6:
         return {
           bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200',
-          title: 'Grievance Resolved & Confirmed',
-          desc: 'Remediation work has been verified by the department and closed.'
+          title: 'Grievance Confirmed & Closed',
+          desc: 'Remediation work has been verified and confirmed by the citizen / community supporters. Case is officially closed.'
         };
       default:
         return null;

@@ -44,9 +44,9 @@ export const findById = async (id) => {
            u2.full_name as reviewed_by_name
     FROM complaint_transfers t
     JOIN complaints c ON t.complaint_id = c.id
-    JOIN departments fd ON t.from_department_id = fd.id
+    LEFT JOIN departments fd ON t.from_department_id = fd.id
     LEFT JOIN departments td ON t.to_department_id = td.id
-    JOIN users u1 ON t.transferred_by = u1.id
+    LEFT JOIN users u1 ON t.transferred_by = u1.id
     LEFT JOIN users u2 ON t.receiving_decided_by = u2.id
     WHERE t.id = $1
   `;
@@ -81,8 +81,8 @@ export const findIncomingTransfers = async (departmentId, { status = 'PENDING' }
            u.full_name as initiated_by_name
     FROM complaint_transfers t
     JOIN complaints c ON t.complaint_id = c.id
-    JOIN departments fd ON t.from_department_id = fd.id
-    JOIN users u ON t.transferred_by = u.id
+    LEFT JOIN departments fd ON t.from_department_id = fd.id
+    LEFT JOIN users u ON t.transferred_by = u.id
     WHERE t.to_department_id = $1 AND ($2::text IS NULL OR t.receiving_decision = $2)
     ORDER BY t.transferred_at DESC;
   `;
@@ -102,7 +102,7 @@ export const findOutgoingTransfers = async (departmentId, { status } = {}) => {
     FROM complaint_transfers t
     JOIN complaints c ON t.complaint_id = c.id
     LEFT JOIN departments td ON t.to_department_id = td.id
-    JOIN users u ON t.transferred_by = u.id
+    LEFT JOIN users u ON t.transferred_by = u.id
     WHERE t.from_department_id = $1 AND ($2::text IS NULL OR t.receiving_decision = $2)
     ORDER BY t.transferred_at DESC;
   `;
@@ -159,9 +159,9 @@ export const findAllTransfers = async ({ limit = 50, offset = 0, status } = {}) 
            u2.full_name as reviewed_by_name
     FROM complaint_transfers t
     JOIN complaints c ON t.complaint_id = c.id
-    JOIN departments fd ON t.from_department_id = fd.id
+    LEFT JOIN departments fd ON t.from_department_id = fd.id
     LEFT JOIN departments td ON t.to_department_id = td.id
-    JOIN users u ON t.transferred_by = u.id
+    LEFT JOIN users u ON t.transferred_by = u.id
     LEFT JOIN users u2 ON t.receiving_decided_by = u2.id
     WHERE ($3::text IS NULL OR t.receiving_decision = $3)
     ORDER BY t.transferred_at DESC

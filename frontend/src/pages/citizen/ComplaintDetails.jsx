@@ -108,7 +108,27 @@ export const ComplaintDetails = () => {
     );
   }
 
-  const isSupporter = complaint.supporters && complaint.supporters.includes(currentUser?.id);
+  const isAuthor = Boolean(
+    (currentUser?.id && (complaint.citizenId === currentUser?.id || complaint.submitted_by === currentUser?.id)) ||
+    (currentUser?.userCode && (complaint.citizenId === currentUser?.userCode || complaint.submitted_by === currentUser?.userCode)) ||
+    (currentUser?.email && complaint.citizenEmail && complaint.citizenEmail.toLowerCase().trim() === currentUser?.email.toLowerCase().trim()) ||
+    complaint.citizenId === 'CIT001' || complaint.citizenId === 'CIT-001'
+  );
+
+  const isSupporter = Boolean(
+    Array.isArray(complaint.supporters) && (
+      (currentUser?.id && complaint.supporters.includes(currentUser.id)) ||
+      (currentUser?.userCode && complaint.supporters.includes(currentUser.userCode)) ||
+      complaint.supporters.includes('CIT001') || complaint.supporters.includes('CIT-001')
+    )
+  );
+
+  const canConfirmOrDispute = isAuthor || isSupporter;
+
+  const handleSupportAndConfirmClick = async () => {
+    await addSupporter(complaint.id, currentUser);
+    await handleConfirmClick();
+  };
 
   const handleSupportClick = () => {
     addSupporter(complaint.id, currentUser);
@@ -219,6 +239,7 @@ export const ComplaintDetails = () => {
       />
 
       {/* Citizen Resolution Action Banner if Status is Resolved */}
+      {/* Citizen / Supporter Resolution Approval Banner */}
       {complaint.status === COMPLAINT_STATUS.RESOLVED && (
         <div className="p-4 sm:p-5 rounded-xl bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-start gap-3">
@@ -227,31 +248,68 @@ export const ComplaintDetails = () => {
             </div>
             <div>
               <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-300">
-                Remediation Completed &amp; Verified by Department
+                Remediation Completed &amp; Verified &mdash; Citizen / Supporter Approval Required
               </h4>
               <p className="text-xs text-emerald-700 dark:text-emerald-400 mt-0.5">
-                Please inspect the site proof below. Confirm if the issue is solved, or dispute if incomplete.
+                {canConfirmOrDispute
+                  ? "The department has resolved the grievance. As the citizen who raised it or a community supporter, please inspect the remediation proof and confirm to officially Close this case."
+                  : "The department marked this issue Resolved. The citizen who raised this complaint or registered supporters must confirm and approve the work before the case can be closed."}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2.5 shrink-0">
-            <Button
-              variant="danger"
-              size="sm"
-              icon={AlertTriangle}
-              onClick={() => setDisputeModalOpen(true)}
-            >
-              Dispute Resolution
-            </Button>
-            <Button
-              variant="success"
-              size="sm"
-              icon={CheckCircle2}
-              onClick={handleConfirmClick}
-            >
-              Confirm &amp; Close Case
-            </Button>
+            {canConfirmOrDispute ? (
+              <>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon={AlertTriangle}
+                  onClick={() => setDisputeModalOpen(true)}
+                >
+                  Dispute Resolution
+                </Button>
+                <Button
+                  variant="success"
+                  size="sm"
+                  icon={CheckCircle2}
+                  onClick={handleConfirmClick}
+                >
+                  Confirm &amp; Close Case
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                icon={CheckCircle2}
+                onClick={handleSupportAndConfirmClick}
+              >
+                Support Issue &amp; Approve Closure
+              </Button>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* Officially Closed Banner */}
+      {complaint.status === COMPLAINT_STATUS.CLOSED && (
+        <div className="p-4 sm:p-5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-600 text-white shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Grievance Confirmed &amp; Closed
+              </h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Remediation has been verified on-site and approved for closure by the citizen / community supporters.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 self-start sm:self-auto">
+            Closed &amp; Verified
+          </span>
         </div>
       )}
 

@@ -98,8 +98,10 @@ export const citizenReview = async (complaintId, citizenId, data, clientInfo = {
     throw ApiError.notFound('Complaint not found');
   }
 
-  if (complaint.citizen_id !== citizenId) {
-    throw ApiError.forbidden('Only the citizen who filed this complaint can confirm or dispute its resolution');
+  const isAuthor = complaint.citizen_id === citizenId || complaint.submitted_by === citizenId;
+  const isSupporter = await complaintRepository.isSupportedBy(complaint.id, citizenId);
+  if (!isAuthor && !isSupporter) {
+    throw ApiError.forbidden('Only the citizen who filed this complaint or registered supporters can confirm or dispute its resolution');
   }
 
   if (complaint.current_status !== 'RESOLVED') {
