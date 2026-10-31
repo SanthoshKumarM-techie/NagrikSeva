@@ -22,6 +22,7 @@ import Input from '../../components/common/Input';
 import { formatDate, formatDateTime } from '../../utils/statusHelpers';
 
 import escalationsApi from '../../api/escalations.api';
+import { INITIAL_WORKERS } from '../../data/mockWorkers';
 
 export const Escalations = () => {
   const { complaints, workers, assignWorker } = useComplaints();

@@ -294,7 +294,11 @@ export const ComplaintProvider = ({ children }) => {
   const [departments, setDepartments] = useState(() => getStorage(STORAGE_KEYS.DEPARTMENTS, FALLBACK_DEPARTMENTS));
   const [categories, setCategories] = useState(() => getStorage('nagrikseva_categories', FALLBACK_CATEGORIES));
   const [wards, setWards] = useState(() => getStorage('nagrikseva_wards', FALLBACK_WARDS));
-  const [workers, setWorkers] = useState(() => getStorage(STORAGE_KEYS.WORKERS, []));
+  const [workers, setWorkers] = useState(() => {
+    const cached = getStorage(STORAGE_KEYS.WORKERS, null);
+    if (cached && Array.isArray(cached) && cached.length > 0) return cached;
+    return INITIAL_WORKERS;
+  });
   const [slas, setSlas] = useState(() => getStorage(STORAGE_KEYS.SLAS, []));
   const [users, setUsers] = useState(() => getStorage(STORAGE_KEYS.USERS, INITIAL_USERS));
   const [loading, setLoading] = useState(false);
@@ -419,16 +423,16 @@ export const ComplaintProvider = ({ children }) => {
       if (isStaff) {
         try {
           const workersRes = await usersApi.getDepartmentWorkers();
-          if (workersRes) {
+          if (workersRes && Array.isArray(workersRes) && workersRes.length > 0) {
             const mappedWorkers = workersRes.map(w => ({
               id: w.id,
               name: w.full_name || w.name,
               email: w.email,
-              phone: w.phone,
+              phone: w.phone || w.phone_number,
               zone: w.assigned_zone || 'Central Zone',
               departmentId: w.department_id,
-              department: w.department_name,
-              specialization: Array.isArray(w.specializations) ? w.specializations.join(', ') : (w.specialization || 'Pothole Patching'),
+              department: w.department_name || departments.find(d => d.id === w.department_id)?.name || 'General Operations',
+              specialization: Array.isArray(w.specializations) ? w.specializations.join(', ') : (w.specialization || 'Maintenance & Repairs'),
               rating: parseFloat(w.rating || 4.8),
               activeTasks: w.active_tasks_count || 0,
               completedTasks: w.completed_tasks_count || 0,

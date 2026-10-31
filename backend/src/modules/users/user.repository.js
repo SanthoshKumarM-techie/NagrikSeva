@@ -158,19 +158,22 @@ export const updateStatus = async (id, isActive) => {
 };
 
 export const findWorkersByDepartment = async (departmentId, { isAvailable } = {}) => {
+  const isAll = !departmentId || departmentId === 'all';
   let query = `
     SELECT u.id, u.full_name, u.email, u.phone as phone_number, NULL as avatar_url,
            w.user_id as worker_profile_id, w.specializations as specialization, TRUE as is_available,
            (SELECT COUNT(*)::int FROM worker_assignments a WHERE a.worker_id = u.id AND a.status IN ('ASSIGNED', 'ACCEPTED', 'INSPECTION', 'IN_PROGRESS')) as active_tasks_count,
            w.rating,
+           d.id as department_id, d.name as department_name,
            mw.ward_number, mw.name as ward_name
     FROM users u
     JOIN worker_profiles w ON u.id = w.user_id
+    LEFT JOIN departments d ON u.department_id = d.id
     LEFT JOIN municipal_wards mw ON u.ward_id = mw.id
-    WHERE u.department_id = $1 AND u.role = 'FIELD_WORKER'::user_role AND u.is_active = TRUE
+    WHERE ($1::uuid IS NULL OR u.department_id = $1) AND u.role = 'FIELD_WORKER'::user_role AND u.is_active = TRUE
     ORDER BY active_tasks_count ASC, w.rating DESC;
   `;
-  const result = await db.query(query, [departmentId]);
+  const result = await db.query(query, [isAll ? null : departmentId]);
   return result.rows;
 };
 
