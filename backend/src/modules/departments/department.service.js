@@ -63,7 +63,7 @@ export const createDepartment = async (data, adminId, clientInfo = {}) => {
   const officerEmail = (data.email || data.contactEmail || `${cleanCode.toLowerCase()}.grievance@bbmp.gov.in`).trim().toLowerCase();
   const officerName = (data.headOfficer || data.nodalOfficer || `${cleanName} Nodal Officer`).trim();
   const officerPhone = (data.phone || data.contactPhone || '+91 80 2266 0000').trim();
-  const initialPassword = data.initialPassword || data.password || `Officer@${cleanCode}123`;
+  const initialPassword = data.initialPassword || data.password || 'officer123';
 
   try {
     // Generate sequential user code for the department officer (e.g. OFF001, OFF002, OFF003)
@@ -116,30 +116,13 @@ export const createDepartment = async (data, adminId, clientInfo = {}) => {
     // Link Nodal Officer to Department
     await db.query(`UPDATE departments SET nodal_officer_id = $1 WHERE id = $2;`, [officerId, dept.id]);
 
-    // Dispatch official credentials email via Brevo SMTP relay
-    let emailDispatched = false;
-    try {
-      emailDispatched = await mailService.sendDepartmentOfficerWelcomeEmail({
-        toEmail: officerEmail,
-        fullName: officerName,
-        userCode: finalUserCode,
-        temporaryPassword: initialPassword,
-        departmentName: cleanName,
-        departmentCode: cleanCode,
-        loginUrl: `${process.env.CLIENT_URL || process.env.CORS_ORIGIN || 'http://localhost:5173'}/login?portal=officer`
-      });
-    } catch (mailErr) {
-      console.warn('Mail dispatch note for new department officer:', mailErr.message);
-    }
-
     officerAccount = {
       userCode: finalUserCode,
       fullName: officerName,
       email: officerEmail,
       phone: officerPhone,
       temporaryPassword: initialPassword,
-      portalUrl: '/login?portal=officer',
-      emailDispatched: Boolean(emailDispatched)
+      portalUrl: '/login?portal=officer'
     };
   } catch (userErr) {
     console.error('Auto-officer account creation error:', userErr);

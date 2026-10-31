@@ -22,7 +22,6 @@ import PageHeader from '../../components/layout/PageHeader';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import Input from '../../components/common/Input';
-import { sendDepartmentCredentialsEmail } from '../../services/email/emailService';
 
 export const Departments = () => {
   const { departments, complaints, addDepartment, updateDepartment } = useComplaints();
@@ -126,19 +125,6 @@ export const Departments = () => {
             departmentCode: cleanCode
           });
           setCredentialsModalOpen(true);
-
-          // Dispatch official credentials to the given email
-          const targetEmail = officer.email || formData.email;
-          if (targetEmail) {
-            sendDepartmentCredentialsEmail({
-              toEmail: targetEmail,
-              fullName: officer.fullName || formData.headOfficer,
-              userCode: officer.userCode,
-              temporaryPassword: officer.temporaryPassword || formData.initialPassword,
-              departmentName: formData.name,
-              departmentCode: cleanCode
-            }).catch(err => console.warn('[EmailJS] Department credentials dispatch note:', err));
-          }
         } else {
           setSuccessToast(`Department "${formData.name}" registered successfully.`);
           setTimeout(() => setSuccessToast(''), 4000);
@@ -371,12 +357,12 @@ Portal Login: ${window.location.origin}/login?portal=officer`;
               <Input
                 label="Custom Initial Password (Optional)"
                 type="text"
-                placeholder="Leave blank to auto-generate (Officer@[CODE]123)"
+                placeholder="officer123 (Default for all initial logins)"
                 value={formData.initialPassword}
                 onChange={(e) => setFormData({ ...formData, initialPassword: e.target.value })}
               />
               <p className="text-[11px] text-slate-500 mt-1">
-                An official user account (e.g. OFF003) will be automatically provisioned and credentials sent to the registered email address.
+                An official nodal officer account (e.g. OFF003) will be automatically created with default initial password officer123. The officer can change their password after first sign-in.
               </p>
             </div>
           )}
@@ -507,13 +493,11 @@ Portal Login: ${window.location.origin}/login?portal=officer`;
               </div>
             </div>
 
-            {/* Email Dispatch Notice */}
-            <div className="p-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 flex items-start gap-2.5 text-xs text-blue-800 dark:text-blue-300">
-              <Send className="w-4 h-4 shrink-0 text-blue-600 mt-0.5" />
+            {/* Direct Login & Security Notice */}
+            <div className="p-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 flex items-start gap-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+              <Key className="w-4 h-4 shrink-0 text-emerald-600 mt-0.5" />
               <span>
-                {createdOfficer.emailDispatched
-                  ? `An official onboarding email containing these credentials and security instructions has been automatically dispatched to ${createdOfficer.email} via Brevo SMTP.`
-                  : `Credentials generated. Please share these credentials with ${createdOfficer.fullName} (${createdOfficer.email}). They can reset their password anytime using the Mail OTP recovery flow.`}
+                Standard initial login password is <strong>{createdOfficer.temporaryPassword || "officer123"}</strong>. Please provide these credentials to {createdOfficer.fullName}. The officer can sign in directly through the Officer Portal and update their password upon first login.
               </span>
             </div>
           </div>
