@@ -476,7 +476,7 @@ export const TaskDetails = () => {
               </div>
             </div>
 
-            {/* Notes */}
+            {/* Notes with Google-style Voice Typing */}
             <Input
               label="Field Crew Completion Notes"
               type="textarea"
@@ -484,6 +484,8 @@ export const TaskDetails = () => {
               placeholder="e.g. Cleared 2 metric tonnes of debris. Hot asphalt compacted with 2-tonne vibrating roller. Site opened to two-way traffic."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              enableVoice={true}
+              onVoiceChange={(text) => setNotes(text)}
             />
 
             {/* Action Bar */}
@@ -541,6 +543,8 @@ export const TaskDetails = () => {
             onChange={(e) => setInspectionFindings(e.target.value)}
             placeholder="e.g. Barricades deployed, area cleared"
             required
+            enableVoice={true}
+            onVoiceChange={(text) => setInspectionFindings(text)}
           />
         </div>
       </Modal>

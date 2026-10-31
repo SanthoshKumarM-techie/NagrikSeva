@@ -1,5 +1,6 @@
 import React, { useState, forwardRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
+import { VoiceTextarea } from './VoiceTextarea.jsx';
 
 export const Input = forwardRef(({
   label,
@@ -18,12 +19,33 @@ export const Input = forwardRef(({
   showPasswordToggle = true,
   isPasswordVisible,
   onTogglePasswordVisibility,
-  readOnly,
-  autoComplete,
+  enableVoice = false,
+  onVoiceChange,
   ...props
 }, ref) => {
   const [internalShowPassword, setInternalShowPassword] = useState(false);
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+
+  // If textarea and voice typing requested, delegate to VoiceTextarea
+  if (type === 'textarea' && enableVoice) {
+    return (
+      <VoiceTextarea
+        id={inputId}
+        label={label}
+        value={value}
+        onChange={onChange}
+        onVoiceChange={onVoiceChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        rows={rows}
+        required={required}
+        error={error}
+        helperText={helperText}
+        className={className}
+        {...props}
+      />
+    );
+  }
 
   const isPassword = type === 'password';
   const showPassword = isPasswordVisible !== undefined ? isPasswordVisible : internalShowPassword;
