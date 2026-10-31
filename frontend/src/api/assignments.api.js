@@ -3,23 +3,27 @@ import axiosInstance from './axiosInstance';
 export const assignmentsApi = {
   getMyTasks: async (params = {}) => {
     const response = await axiosInstance.get('/assignments/my-tasks', { params });
-    return response.data?.tasks || [];
+    const payload = response.data?.data || response.data;
+    return payload?.tasks || payload || [];
   },
 
   getAssignmentById: async (id) => {
     const response = await axiosInstance.get(`/assignments/${id}`);
-    return response.data?.assignment || null;
+    const payload = response.data?.data || response.data;
+    return payload?.assignment || payload || null;
   },
 
   createAssignment: async (data) => {
     // data: { complaintId, workerId, assignmentNotes }
     const response = await axiosInstance.post('/assignments', data);
-    return response.data?.assignment;
+    const payload = response.data?.data || response.data;
+    return payload?.assignment || payload;
   },
 
   acceptAssignment: async (id) => {
     const response = await axiosInstance.patch(`/assignments/${id}/accept`);
-    return response.data?.assignment;
+    const payload = response.data?.data || response.data;
+    return payload?.assignment || payload;
   },
 
   logInspection: async (id, data = {}) => {
@@ -29,12 +33,14 @@ export const assignmentsApi = {
       ...data
     };
     const response = await axiosInstance.post(`/assignments/${id}/inspection`, payload);
-    return response.data?.update;
+    const resPayload = response.data?.data || response.data;
+    return resPayload?.update || resPayload;
   },
 
   startRemediation: async (id) => {
     const response = await axiosInstance.patch(`/assignments/${id}/start`);
-    return response.data?.assignment;
+    const payload = response.data?.data || response.data;
+    return payload?.assignment || payload;
   },
 
   addProgressUpdate: async (id, data = {}) => {
@@ -44,7 +50,8 @@ export const assignmentsApi = {
       ...data
     };
     const response = await axiosInstance.post(`/assignments/${id}/progress`, payload);
-    return response.data?.update;
+    const resPayload = response.data?.data || response.data;
+    return resPayload?.update || resPayload;
   },
 
   completeWork: async (id, data = {}) => {
@@ -60,7 +67,8 @@ export const assignmentsApi = {
       afterEvidenceUrls: evidenceUrls
     };
     const response = await axiosInstance.post(`/assignments/${id}/complete`, payload);
-    return response.data?.assignment;
+    const resPayload = response.data?.data || response.data;
+    return resPayload?.assignment || resPayload;
   },
 };
 

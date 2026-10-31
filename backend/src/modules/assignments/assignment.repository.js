@@ -29,7 +29,7 @@ export const findById = async (id) => {
     FROM worker_assignments a
     JOIN complaints c ON a.complaint_id = c.id
     JOIN users u_w ON a.worker_id = u_w.id
-    JOIN users u_a ON a.assigned_by = u_a.id
+    LEFT JOIN users u_a ON a.assigned_by = u_a.id
     WHERE a.id::text = $1 OR a.complaint_id::text = $1 OR UPPER(c.ticket_number) = UPPER($1)
     ORDER BY a.assigned_at DESC
     LIMIT 1;
@@ -67,8 +67,8 @@ export const findWorkerTasks = async (workerId, { status } = {}) => {
            u_c.full_name as citizen_name, u_c.phone as citizen_phone
     FROM worker_assignments a
     JOIN complaints c ON a.complaint_id = c.id
-    JOIN complaint_categories cat ON c.category_id = cat.id
-    JOIN users u_c ON c.submitted_by = u_c.id
+    LEFT JOIN complaint_categories cat ON c.category_id = cat.id
+    LEFT JOIN users u_c ON c.submitted_by = u_c.id
     WHERE a.worker_id = $1
   `;
   const params = [workerId];

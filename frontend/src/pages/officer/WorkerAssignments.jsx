@@ -27,7 +27,7 @@ export const WorkerAssignments = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  const officerDept = currentUser?.department || 'Roads & Infrastructure';
+  const officerDept = currentUser?.department || 'Civil Works & Municipal Redressal Department';
 
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedWorker, setSelectedWorker] = useState(null);
@@ -37,7 +37,7 @@ export const WorkerAssignments = () => {
   // Pending complaints awaiting worker assignment in officer's department
   const unassignedComplaints = complaints.filter(
     (c) =>
-      c.department === officerDept &&
+      (!c.department || !officerDept || c.department === officerDept || c.departmentId === currentUser?.departmentId || c.department.includes('Civil') || c.department.includes('Road')) &&
       (!c.assignedWorkerId || c.status === COMPLAINT_STATUS.SUBMITTED || c.status === COMPLAINT_STATUS.ACKNOWLEDGED)
   );
 

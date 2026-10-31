@@ -22,55 +22,16 @@ const ComplaintContext = createContext();
 export const FALLBACK_DEPARTMENTS = [
   {
     id: '11111111-1111-1111-1111-111111111101',
-    code: 'ROAD',
-    name: 'Road Infrastructure & Maintenance',
-    description: 'Maintenance of asphalt roads, potholes, pedestrian paths, and storm drainage bridges.',
-    contactEmail: 'roads@bbmp.gov.in',
-    contactPhone: '+91 80 2266 0001',
-    isActive: true,
-    activeComplaints: 8,
-    totalComplaints: 15,
-    staffCount: 12,
-    slaTargetPct: 92
-  },
-  {
-    id: '11111111-1111-1111-1111-111111111102',
-    code: 'SWM',
-    name: 'Solid Waste Management',
-    description: 'Garbage collection, illegal dumping removal, dry/wet waste segregation, and community dustbins.',
-    contactEmail: 'swm@bbmp.gov.in',
-    contactPhone: '+91 80 2266 0002',
+    code: 'CIVIC',
+    name: 'Civil Works & Municipal Redressal Department',
+    description: 'Unified department managing all civic grievances, road repairs, sanitation, electrical and infrastructure works.',
+    contactEmail: 'officer@bbmp.gov.in',
+    contactPhone: '+91 80 2266 0000',
     isActive: true,
     activeComplaints: 0,
     totalComplaints: 0,
-    staffCount: 12,
-    slaTargetPct: 92
-  },
-  {
-    id: '11111111-1111-1111-1111-111111111103',
-    code: 'BWSSB',
-    name: 'Water Supply & Sewerage Board',
-    description: 'Fresh drinking water pipelines, sewage overflows, open manholes, and underground drain blockages.',
-    contactEmail: 'water@bbmp.gov.in',
-    contactPhone: '+91 80 2266 0003',
-    isActive: true,
-    activeComplaints: 4,
-    totalComplaints: 4,
-    staffCount: 12,
-    slaTargetPct: 92
-  },
-  {
-    id: '11111111-1111-1111-1111-111111111104',
-    code: 'ELEC',
-    name: 'Street Lighting & Electrical',
-    description: 'Public street illumination, solar lampposts, exposed underground cables, and timer repairs.',
-    contactEmail: 'electrical@bbmp.gov.in',
-    contactPhone: '+91 80 2266 0004',
-    isActive: true,
-    activeComplaints: 0,
-    totalComplaints: 0,
-    staffCount: 12,
-    slaTargetPct: 92
+    staffCount: 1,
+    slaTargetPct: 95
   }
 ];
 
