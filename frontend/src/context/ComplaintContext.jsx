@@ -536,6 +536,22 @@ export const ComplaintProvider = ({ children }) => {
 
       setComplaints(prev => [mapped, ...prev]);
 
+      // Immediately keep local citizen caches in sync for real-time dashboard & pie chart updates
+      try {
+        const cachedMy = getStorage('nagrik_my_complaints_cache', []);
+        const updatedMy = [mapped, ...(Array.isArray(cachedMy) ? cachedMy.filter(c => c.id !== mapped.id) : [])];
+        setStorage('nagrik_my_complaints_cache', updatedMy);
+
+        const cachedStats = getStorage('nagrik_citizen_stats_cache', null);
+        if (cachedStats) {
+          setStorage('nagrik_citizen_stats_cache', {
+            ...cachedStats,
+            totalComplaints: (cachedStats.totalComplaints || 0) + 1,
+            pendingCount: (cachedStats.pendingCount || 0) + 1
+          });
+        }
+      } catch (_) {}
+
       // Notify officer
       addNotification({
         userId: targetDept?.headOfficerId || 'OFF001',
