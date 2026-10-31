@@ -1174,8 +1174,8 @@ export const ComplaintProvider = ({ children }) => {
               {
                 id: `tl-${Date.now()}`,
                 status: COMPLAINT_STATUS.CLOSED,
-                title: 'Citizen Confirmed Resolution — Case Closed',
-                description: `${citizenUser?.name || 'Citizen'} verified civic restoration and closed grievance.`,
+                title: 'Resolution Approved by Citizen / Supporter — Case Closed',
+                description: `${citizenUser?.name || 'Citizen'} verified civic restoration on-site and approved final ticket closure.`,
                 timestamp,
                 author: citizenUser?.name || 'Citizen',
                 role: 'Citizen'
