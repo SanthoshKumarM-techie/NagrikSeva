@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Navigation,
   CheckSquare,
   Clock,
   Wrench,
@@ -19,6 +20,7 @@ import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import { formatDate, timeAgo } from '../../utils/statusHelpers';
 import assignmentsApi from '../../api/assignments.api';
+import ContractorDispatchMap from '../../components/dashboard/ContractorDispatchMap';
 
 export const WorkerDashboard = () => {
   const { complaints } = useComplaints();
@@ -26,6 +28,7 @@ export const WorkerDashboard = () => {
   const navigate = useNavigate();
 
   const [backendTasks, setBackendTasks] = useState([]);
+  const [selectedTask, setSelectedTask] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -159,6 +162,90 @@ export const WorkerDashboard = () => {
           color="red"
           onClick={() => navigate('/worker/tasks')}
         />
+      </div>
+
+      {/* Contractor & Crew Operations Fleet Dispatch Radar (Uber / Red Taxi Driver Map) */}
+      <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] border border-emerald-500/20">
+                FIELD TELEMETRY
+              </span>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Active Crew Dispatch & Incident Corridor Radar
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Live Uber-style route navigation to citizen-reported grievance spots across your operational ward.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              {workerTasks.length} Active Work Locations
+            </span>
+          </div>
+        </div>
+
+        {workerTasks.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="lg:col-span-2">
+              <ContractorDispatchMap
+                task={selectedTask || workerTasks[0]}
+                tasks={workerTasks}
+                selectedTaskId={(selectedTask || workerTasks[0])?.id}
+                onSelectTask={setSelectedTask}
+                height="h-[430px]"
+              />
+            </div>
+            <div className="gov-card p-4 flex flex-col justify-between space-y-3">
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider mb-2">
+                  Select Incident Corridor
+                </h4>
+                <div className="space-y-2 max-h-[310px] overflow-y-auto pr-1">
+                  {workerTasks.map((t) => {
+                    const isSelected = (selectedTask?.id || workerTasks[0]?.id) === t.id;
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedTask(t)}
+                        className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-blue-50/80 dark:bg-blue-950/40 border-blue-500 shadow-sm'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-mono text-xs font-bold text-blue-600">
+                            {t.ticketNumber || t.id}
+                          </span>
+                          <Badge status={t.status} size="sm" />
+                        </div>
+                        <p className="text-xs font-medium text-slate-900 dark:text-slate-100 line-clamp-1">
+                          {t.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-1">
+                          <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="truncate">{t.location}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                icon={Navigation}
+                className="w-full"
+                onClick={() => navigate(`/worker/tasks/${(selectedTask || workerTasks[0])?.complaintId || (selectedTask || workerTasks[0])?.id}`)}
+              >
+                Inspect Work Order Route
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Immediate Tasks Queue */}
