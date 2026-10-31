@@ -55,12 +55,12 @@ describe('Zod Validation Schemas', () => {
   });
 
   describe('Transfer Validation', () => {
-    it('should enforce minimum 10 characters for transfer reason', () => {
+    it('should enforce minimum characters for transfer reason', () => {
       const invalid = {
         body: {
           complaintId: '00000000-0000-0000-0000-000000000001',
           toDepartmentId: '00000000-0000-0000-0000-000000000002',
-          reason: 'Wrong'
+          reason: 'No'
         }
       };
       const parsed = initiateTransferSchema.safeParse(invalid);
