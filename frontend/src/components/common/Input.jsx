@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export const Input = ({
   label,
@@ -14,9 +15,27 @@ export const Input = ({
   required = false,
   className = '',
   rows = 3,
+  showPasswordToggle = true,
+  isPasswordVisible,
+  onTogglePasswordVisibility,
   ...props
 }) => {
+  const [internalShowPassword, setInternalShowPassword] = useState(false);
   const inputId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : undefined);
+
+  const isPassword = type === 'password';
+  const showPassword = isPasswordVisible !== undefined ? isPasswordVisible : internalShowPassword;
+
+  const togglePasswordVisibility = () => {
+    if (disabled) return;
+    if (onTogglePasswordVisibility) {
+      onTogglePasswordVisibility(!showPassword);
+    } else {
+      setInternalShowPassword((prev) => !prev);
+    }
+  };
+
+  const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
   return (
     <div className={`w-full ${className}`}>
@@ -49,22 +68,43 @@ export const Input = ({
             {...props}
           />
         ) : (
-          <input
-            id={inputId}
-            type={type}
-            value={value}
-            onChange={onChange}
-            disabled={disabled}
-            placeholder={placeholder}
-            className={`block w-full rounded-lg border text-sm transition-colors duration-150 h-10 px-3 ${
-              Icon ? 'pl-9' : ''
-            } ${
-              error
-                ? 'border-rose-400 bg-rose-50/20 text-rose-900 dark:text-rose-300 focus:border-rose-500 focus:ring-rose-500'
-                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 focus:ring-1'
-            } disabled:bg-slate-50 dark:disabled:bg-slate-900 disabled:text-slate-400 disabled:cursor-not-allowed`}
-            {...props}
-          />
+          <>
+            <input
+              id={inputId}
+              type={effectiveType}
+              value={value}
+              onChange={onChange}
+              disabled={disabled}
+              placeholder={placeholder}
+              className={`block w-full rounded-lg border text-sm transition-colors duration-150 h-10 px-3 ${
+                Icon ? 'pl-9' : ''
+              } ${
+                isPassword && showPasswordToggle ? 'pr-10' : ''
+              } ${
+                error
+                  ? 'border-rose-400 bg-rose-50/20 text-rose-900 dark:text-rose-300 focus:border-rose-500 focus:ring-rose-500'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:border-blue-500 focus:ring-blue-500 focus:ring-1'
+              } disabled:bg-slate-50 dark:disabled:bg-slate-900 disabled:text-slate-400 disabled:cursor-not-allowed`}
+              {...props}
+            />
+            {isPassword && showPasswordToggle && (
+              <button
+                type="button"
+                onClick={togglePasswordVisibility}
+                disabled={disabled}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                aria-label={showPassword ? 'Hide password' : 'View password'}
+                title={showPassword ? 'Hide password' : 'View password'}
+                tabIndex={-1}
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            )}
+          </>
         )}
       </div>
       {error ? (
@@ -77,4 +117,3 @@ export const Input = ({
 };
 
 export default Input;
-

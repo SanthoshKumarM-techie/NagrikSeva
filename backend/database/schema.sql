@@ -223,6 +223,20 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 14b. EMAIL NOTIFICATION LOGS (EmailJS Integration)
+CREATE TABLE IF NOT EXISTS email_notification_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    complaint_id UUID REFERENCES complaints(id) ON DELETE CASCADE,
+    recipient_email VARCHAR(255) NOT NULL,
+    recipient_type VARCHAR(50) NOT NULL CHECK (recipient_type IN ('WORKER', 'CITIZEN', 'OFFICER', 'ADMIN')),
+    notification_type VARCHAR(100) NOT NULL,
+    delivery_attempt_status VARCHAR(50) NOT NULL CHECK (delivery_attempt_status IN ('SENT', 'FAILED', 'PENDING', 'SIMULATED')),
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    sent_at TIMESTAMPTZ
+);
+
+
 -- 15. SLA RULES
 CREATE TABLE IF NOT EXISTS sla_rules (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -7,19 +7,21 @@ export const officerVerificationSchema = z.object({
     reviewNotes: z.string().optional(),
     notes: z.string().optional(),
     reworkInstructions: z.string().optional()
-  }).transform(data => ({
-    ...data,
-    decision: data.decision === 'APPROVED' ? 'APPROVED' : 'REJECTED',
-    reworkInstructions: data.reworkInstructions || data.notes || data.reviewNotes || data.feedback || 'Please rectify on-site defects.'
-  })).refine((data) => {
-    if (data.decision === 'REJECTED' && !data.reworkInstructions) {
+  }).refine((data) => {
+    const isReject = data.decision === 'REJECTED' || data.decision === 'REWORK_REQUIRED';
+    const instructions = data.reworkInstructions || data.notes || data.reviewNotes || data.feedback;
+    if (isReject && (!instructions || instructions.trim().length === 0)) {
       return false;
     }
     return true;
   }, {
     message: 'Rework instructions are required when rejecting work completion',
     path: ['reworkInstructions']
-  })
+  }).transform(data => ({
+    ...data,
+    decision: data.decision === 'APPROVED' ? 'APPROVED' : 'REJECTED',
+    reworkInstructions: data.reworkInstructions || data.notes || data.reviewNotes || data.feedback || (data.decision === 'APPROVED' ? undefined : 'Please rectify on-site defects.')
+  }))
 });
 
 export const citizenFeedbackSchema = z.object({

@@ -94,6 +94,14 @@ export async function markAllNotificationsAsRead(userId) {
   return { marked_count: count };
 }
 
+export async function logEmailNotification(logData) {
+  return await notificationRepository.createEmailNotificationLog(logData);
+}
+
+export async function getEmailNotificationLogs(complaintId) {
+  return await notificationRepository.getEmailNotificationLogs(complaintId);
+}
+
 export default {
   sendNotification,
   notifyUser,
@@ -102,6 +110,8 @@ export default {
   getUserNotifications,
   getUnreadCount,
   markNotificationAsRead,
-  markAllNotificationsAsRead
+  markAllNotificationsAsRead,
+  logEmailNotification,
+  getEmailNotificationLogs
 };
 

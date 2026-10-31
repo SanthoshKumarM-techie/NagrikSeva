@@ -76,11 +76,53 @@ export async function getUsersByRoleAndDepartment(role, departmentId = null, db 
   return res.rows;
 }
 
+export async function createEmailNotificationLog({
+  complaint_id,
+  recipient_email,
+  recipient_type,
+  notification_type,
+  delivery_attempt_status = 'SENT',
+  error_message = null,
+  sent_at = null
+}, db = { query }) {
+  const sql = `
+    INSERT INTO email_notification_logs (
+      complaint_id, recipient_email, recipient_type, notification_type, delivery_attempt_status, error_message, sent_at
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING *;
+  `;
+  const res = await db.query(sql, [
+    complaint_id || null,
+    recipient_email,
+    recipient_type,
+    notification_type,
+    delivery_attempt_status,
+    error_message,
+    sent_at
+  ]);
+  return res.rows[0];
+}
+
+export async function getEmailNotificationLogs(complaintId = null, db = { query }) {
+  let sql = `SELECT * FROM email_notification_logs`;
+  const params = [];
+  if (complaintId) {
+    sql += ` WHERE complaint_id = $1`;
+    params.push(complaintId);
+  }
+  sql += ` ORDER BY created_at DESC LIMIT 100`;
+  const res = await db.query(sql, params);
+  return res.rows;
+}
+
 export default {
   createNotification,
   getUserNotifications,
   countUnreadNotifications,
   markAsRead,
   markAllAsRead,
-  getUsersByRoleAndDepartment
+  getUsersByRoleAndDepartment,
+  createEmailNotificationLog,
+  getEmailNotificationLogs
 };

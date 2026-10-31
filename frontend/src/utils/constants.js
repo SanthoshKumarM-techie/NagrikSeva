@@ -65,5 +65,6 @@ export const STORAGE_KEYS = {
   NOTIFICATIONS: 'nagrik_notifications_data',
   USERS: 'nagrik_users_data',
   SLAS: 'nagrik_sla_configs',
+  EMAIL_LOGS: 'nagrik_email_logs',
 };
 
