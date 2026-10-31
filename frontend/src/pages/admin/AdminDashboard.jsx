@@ -89,10 +89,13 @@ export const AdminDashboard = () => {
   useEffect(() => {
     let isMounted = true;
     analyticsApi.getCityAnalytics().then((res) => {
-      if (isMounted && res?.data) {
-        setCityStats(res.data);
+      const data = res?.analytics || res?.data?.analytics || res?.data || res;
+      if (isMounted && data) {
+        setCityStats(data);
       }
-    }).catch(() => {});
+    }).catch((err) => {
+      console.warn('Admin city analytics fetch note:', err?.message || err);
+    });
 
     fetchTransfers();
 
