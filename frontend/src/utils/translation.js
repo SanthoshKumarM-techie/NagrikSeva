@@ -3,8 +3,12 @@
  * Translates recognized speech from Indian regional languages (Tamil, Kannada, Hindi, Telugu, etc.)
  * to standard English for official civic complaints and work orders.
  *
+ * Implements resilient multi-provider fallback (Google Translate + MyMemory) with in-memory caching.
  * Zero external AI API keys or backend dependencies required.
  */
+
+// In-memory cache to prevent redundant network calls and avoid rate limits
+const translationCache = new Map();
 
 /**
  * Translates given text to English
@@ -32,37 +36,63 @@ export const translateToEnglish = async (text, sourceLang = 'auto') => {
     return trimmed;
   }
 
-  try {
-    const sl = normalizedLang || 'auto';
-    const endpoint = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=en&dt=t&q=${encodeURIComponent(trimmed)}`;
+  const cacheKey = `${normalizedLang}_${trimmed}`;
+  if (translationCache.has(cacheKey)) {
+    return translationCache.get(cacheKey);
+  }
 
-    const response = await fetch(endpoint, {
+  const sl = normalizedLang || 'auto';
+
+  // Strategy 1: Google Translate API
+  try {
+    const googleUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=en&dt=t&q=${encodeURIComponent(trimmed)}`;
+    const res = await fetch(googleUrl, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      }
+      headers: { 'Accept': 'application/json' }
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && Array.isArray(data[0])) {
+        const translated = data[0]
+          .map((segment) => (Array.isArray(segment) ? segment[0] : ''))
+          .filter(Boolean)
+          .join('');
+
+        if (translated && translated.trim()) {
+          const finalResult = translated.trim();
+          translationCache.set(cacheKey, finalResult);
+          return finalResult;
+        }
+      }
     }
-
-    const data = await response.json();
-
-    if (Array.isArray(data) && Array.isArray(data[0])) {
-      const translatedSegments = data[0]
-        .map((segment) => (Array.isArray(segment) ? segment[0] : ''))
-        .filter(Boolean)
-        .join('');
-
-      return translatedSegments.trim() || trimmed;
-    }
-
-    return trimmed;
   } catch (err) {
-    console.warn('Portal auto-translation fallback to original text:', err?.message || err);
-    return trimmed;
+    // Continue to fallback
   }
+
+  // Strategy 2: MyMemory Translation API fallback (if Google rate-limits or fails)
+  try {
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(trimmed)}&langpair=${sl === 'auto' ? 'ta' : sl}|en`;
+    const mmRes = await fetch(myMemoryUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    if (mmRes.ok) {
+      const mmData = await mmRes.json();
+      const mmTranslated = mmData?.responseData?.translatedText;
+      if (mmTranslated && typeof mmTranslated === 'string' && mmTranslated.trim() && !mmTranslated.includes('MYMEMORY WARNING')) {
+        const finalResult = mmTranslated.trim();
+        translationCache.set(cacheKey, finalResult);
+        return finalResult;
+      }
+    }
+  } catch (err) {
+    // Fall back to original
+  }
+
+  // Fallback: return original text safely
+  return trimmed;
 };
 
 export default {
