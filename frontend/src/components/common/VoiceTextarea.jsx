@@ -1,13 +1,14 @@
 /**
  * CivicLens Voice-Enabled Textarea Component
  * Google-style speech-to-text integration using browser Web Speech API.
- * Supports English (en-IN), Tamil (ta-IN), and Kannada (kn-IN).
- * Browser-only — zero external AI APIs or audio uploads.
+ * Supports English (en-IN), Tamil (ta-IN), Kannada (kn-IN), Hindi (hi-IN), and Telugu (te-IN).
+ * When speaking in any language, automatically defaults and converts text to English!
+ * Zero external AI APIs or audio uploads — standard browser speech recognition and translation.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Globe, AlertCircle, Square, Volume2 } from 'lucide-react';
-import { useSpeechToText, SPEECH_LANGUAGES } from '../../hooks/useSpeechToText.js';
+import { Mic, Globe, AlertCircle, Square, Languages, Check } from 'lucide-react';
+import { useSpeechToText, SPEECH_LANGUAGES, DEFAULT_LANGUAGE } from '../../hooks/useSpeechToText.js';
 
 export const VoiceTextarea = ({
   id,
@@ -22,7 +23,8 @@ export const VoiceTextarea = ({
   error = null,
   helperText = null,
   className = '',
-  defaultLanguage = 'en-IN',
+  defaultLanguage = DEFAULT_LANGUAGE,
+  defaultTranslateToEnglish = true,
   ...props
 }) => {
   const [langMenuOpen, setLangMenuOpen] = useState(false);
@@ -53,6 +55,9 @@ export const VoiceTextarea = ({
     isSupported,
     language,
     setLanguage,
+    autoTranslateToEnglish,
+    setAutoTranslateToEnglish,
+    isTranslating,
     error: speechError,
     clearError,
     interimText,
@@ -61,6 +66,7 @@ export const VoiceTextarea = ({
     toggleListening
   } = useSpeechToText({
     initialLanguage: defaultLanguage,
+    defaultTranslateToEnglish,
     onTranscriptUpdate: handleTranscriptUpdate
   });
 
@@ -86,7 +92,28 @@ export const VoiceTextarea = ({
         )}
 
         {/* Voice typing controls toolbar */}
-        <div className="flex items-center gap-1.5 ml-auto text-xs">
+        <div className="flex items-center gap-1.5 ml-auto text-xs flex-wrap">
+          {/* Auto-translate to English indicator / toggle button */}
+          <button
+            type="button"
+            onClick={() => setAutoTranslateToEnglish((prev) => !prev)}
+            disabled={disabled}
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-colors border cursor-pointer ${
+              autoTranslateToEnglish
+                ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                : 'bg-slate-50 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+            }`}
+            title={
+              autoTranslateToEnglish
+                ? 'Auto-Translate to English is ON: Spoken speech in Tamil, Kannada, Hindi, etc. is automatically translated and saved in English.'
+                : 'Auto-Translate is OFF: Text will be saved in the spoken native language.'
+            }
+          >
+            <Languages className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+            <span>To English</span>
+            {autoTranslateToEnglish && <Check className="w-2.5 h-2.5" />}
+          </button>
+
           {/* Language selector dropdown */}
           <div className="relative" ref={langMenuRef}>
             <button
@@ -96,9 +123,9 @@ export const VoiceTextarea = ({
               className={`inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors border ${
                 isListening
                   ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700'
-                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-2xs'
+                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 shadow-2xs cursor-pointer'
               }`}
-              title="Select speech recognition language"
+              title="Select your speaking language"
               aria-label="Speech language"
             >
               <Globe className="w-3.5 h-3.5 text-blue-500" />
@@ -109,7 +136,7 @@ export const VoiceTextarea = ({
             {langMenuOpen && (
               <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-30">
                 <div className="px-2.5 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Select Language
+                  Speaking Language
                 </div>
                 {SPEECH_LANGUAGES.map((l) => (
                   <button
@@ -119,7 +146,7 @@ export const VoiceTextarea = ({
                       setLanguage(l.code);
                       setLangMenuOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors ${
+                    className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between transition-colors cursor-pointer ${
                       language === l.code
                         ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-semibold'
                         : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
@@ -139,7 +166,7 @@ export const VoiceTextarea = ({
               className="text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/50"
               title="Voice typing requires a Web Speech API compatible browser like Google Chrome or Microsoft Edge."
             >
-              Voice typing unsupported
+              Voice unsupported
             </span>
           )}
         </div>
@@ -180,7 +207,7 @@ export const VoiceTextarea = ({
                 ? 'Speech recognition not supported in this browser (use Chrome/Edge)'
                 : isListening
                 ? 'Click to stop listening'
-                : `Click to speak report in ${currentLanguageObj.native}`
+                : `Click to speak in ${currentLanguageObj.native}${autoTranslateToEnglish && language !== 'en-IN' ? ' (auto-translates to English)' : ''}`
             }
             aria-label={isListening ? 'Stop listening' : 'Start voice typing'}
           >
@@ -201,7 +228,7 @@ export const VoiceTextarea = ({
       {/* Live Listening Indicator (Google-style) */}
       {isListening && (
         <div className="mt-2 flex items-center justify-between bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-lg px-3 py-2 text-xs text-blue-900 dark:text-blue-200 animate-fadeIn">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
@@ -209,6 +236,16 @@ export const VoiceTextarea = ({
             <span className="font-semibold">
               Listening ({currentLanguageObj.native})...
             </span>
+            {autoTranslateToEnglish && language !== 'en-IN' && (
+              <span className="text-[11px] bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded font-medium">
+                Auto-translating to English
+              </span>
+            )}
+            {isTranslating && (
+              <span className="text-[11px] text-amber-600 dark:text-amber-400 animate-pulse font-medium">
+                Converting to English...
+              </span>
+            )}
             <span className="text-slate-500 dark:text-slate-400 italic">
               {interimText ? `"${interimText}"` : 'Speak into your microphone...'}
             </span>
@@ -245,9 +282,11 @@ export const VoiceTextarea = ({
       ) : helperText ? (
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{helperText}</p>
       ) : (
-        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
-          <Mic className="w-3 h-3" />
-          <span>Click the microphone to dictate in English, தமிழ், or ಕನ್ನಡ. You can edit text manually anytime.</span>
+        <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1 flex-wrap">
+          <Mic className="w-3 h-3 text-blue-500 shrink-0" />
+          <span>
+            Speak in English, தமிழ், ಕನ್ನಡ, हिन्दी, or తెలుగు. By default, speech is converted into English text for official records.
+          </span>
         </p>
       )}
     </div>

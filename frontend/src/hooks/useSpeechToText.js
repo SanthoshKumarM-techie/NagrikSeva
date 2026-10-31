@@ -1,16 +1,20 @@
 /**
- * CivicLens Speech-to-Text Hook
+ * CivicLens Speech-to-Text Hook with Auto-Translate to English
  * Uses standard browser Web Speech API (window.SpeechRecognition || window.webkitSpeechRecognition).
- * Supports English (en-IN), Tamil (ta-IN), and Kannada (kn-IN).
+ * Supports English (en-IN), Tamil (ta-IN), Kannada (kn-IN), Hindi (hi-IN), and Telugu (te-IN).
+ * When speaking in any regional language, automatically converts the text to English by default!
  * Strictly browser-based — zero external AI API or backend audio calls.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { translateToEnglish } from '../utils/translation.js';
 
 export const SPEECH_LANGUAGES = [
   { code: 'en-IN', name: 'English (India)', native: 'English', flag: '🇮🇳' },
   { code: 'ta-IN', name: 'Tamil', native: 'தமிழ்', flag: '🇮🇳' },
-  { code: 'kn-IN', name: 'Kannada', native: 'ಕನ್ನಡ', flag: '🇮🇳' }
+  { code: 'kn-IN', name: 'Kannada', native: 'ಕನ್ನಡ', flag: '🇮🇳' },
+  { code: 'hi-IN', name: 'Hindi', native: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'te-IN', name: 'Telugu', native: 'తెలుగు', flag: '🇮🇳' }
 ];
 
 export const DEFAULT_LANGUAGE = 'en-IN';
@@ -30,18 +34,22 @@ export const getSpeechRecognitionClass = () => {
  *
  * @param {object} options
  * @param {string} [options.initialLanguage='en-IN']
+ * @param {boolean} [options.defaultTranslateToEnglish=true] - If true, speech in other languages is auto-translated to English
  * @param {function} [options.onTranscriptUpdate] - Callback when recognized text changes: (updatedFullText, interimSnippet) => void
  * @param {function} [options.onError] - Error callback
  */
 export const useSpeechToText = (options = {}) => {
   const {
     initialLanguage = DEFAULT_LANGUAGE,
+    defaultTranslateToEnglish = true,
     onTranscriptUpdate,
     onError
   } = options;
 
   const [isListening, setIsListening] = useState(false);
   const [language, setLanguage] = useState(initialLanguage);
+  const [autoTranslateToEnglish, setAutoTranslateToEnglish] = useState(defaultTranslateToEnglish);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState(null);
   const [interimText, setInterimText] = useState('');
   const [isSupported, setIsSupported] = useState(true);
@@ -138,7 +146,7 @@ export const useSpeechToText = (options = {}) => {
         setError(null);
       };
 
-      recognition.onresult = (event) => {
+      recognition.onresult = async (event) => {
         let currentInterim = '';
         let currentFinal = '';
 
@@ -152,7 +160,24 @@ export const useSpeechToText = (options = {}) => {
         }
 
         if (currentFinal) {
-          accumulatedSpeechRef.current = (accumulatedSpeechRef.current + ' ' + currentFinal).trim();
+          let textToAppend = currentFinal.trim();
+
+          // Auto-translate to English if enabled and not already English
+          if (autoTranslateToEnglish && language !== 'en-IN') {
+            try {
+              setIsTranslating(true);
+              const translated = await translateToEnglish(textToAppend, language);
+              if (translated) {
+                textToAppend = translated;
+              }
+            } catch (err) {
+              console.warn('Auto-translate error, keeping original text:', err);
+            } finally {
+              setIsTranslating(false);
+            }
+          }
+
+          accumulatedSpeechRef.current = (accumulatedSpeechRef.current + ' ' + textToAppend).trim();
         }
 
         setInterimText(currentInterim);
@@ -196,7 +221,7 @@ export const useSpeechToText = (options = {}) => {
       if (onError) onError(msg);
       return false;
     }
-  }, [language, onTranscriptUpdate, onError]);
+  }, [language, autoTranslateToEnglish, onTranscriptUpdate, onError]);
 
   /**
    * Toggle speech recognition
@@ -228,6 +253,9 @@ export const useSpeechToText = (options = {}) => {
     isSupported,
     language,
     setLanguage,
+    autoTranslateToEnglish,
+    setAutoTranslateToEnglish,
+    isTranslating,
     error,
     clearError: () => setError(null),
     interimText,
