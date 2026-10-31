@@ -230,18 +230,6 @@ export const ContractorDispatchMap = ({
           allowFullScreen
           referrerPolicy="no-referrer-when-downgrade"
         />
-
-        {/* Clean floating pin indicator */}
-        <div className="absolute top-3 left-3 pointer-events-none hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800 text-xs shadow-md backdrop-blur-sm">
-          <MapPin className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 shrink-0" />
-          <span className="font-medium text-slate-800 dark:text-slate-200 truncate max-w-xs">
-            {activeTask?.location || 'Incident Location'}
-          </span>
-          <span className="text-slate-300 dark:text-slate-600">&bull;</span>
-          <span className="text-slate-500 dark:text-slate-400 font-mono text-[11px]">
-            {targetLat.toFixed(4)}, {targetLng.toFixed(4)}
-          </span>
-        </div>
       </div>
 
       {/* 3. CLEAN CARD FOOTER & ACTION TOOLBAR */}
