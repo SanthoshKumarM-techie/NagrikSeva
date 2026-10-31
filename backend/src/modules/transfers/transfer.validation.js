@@ -4,7 +4,7 @@ export const initiateTransferSchema = z.object({
   body: z.object({
     complaintId: z.string().min(1, 'Valid Complaint ID is required'),
     toDepartmentId: z.string().optional().nullable().or(z.literal('')),
-    reason: z.string().min(3, 'Transfer reason is required')
+    reason: z.string().min(10, 'Transfer reason must be at least 10 characters')
   })
 });
 
