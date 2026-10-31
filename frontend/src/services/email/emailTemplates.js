@@ -27,6 +27,11 @@ export const buildWorkerAssignmentParams = ({ worker, complaint, officer, notes 
 
   return {
     to_email: worker.email,
+    email: worker.email,
+    recipient_email: worker.email,
+    user_email: worker.email,
+    to: worker.email,
+    reply_to: worker.email,
     to_name: worker.name || 'Field Specialist',
     worker_name: worker.name || 'Field Specialist',
     complaint_id: complaintId,
@@ -85,6 +90,11 @@ export const buildCitizenTrackerParams = ({ complaint, recipientEmail, recipient
 
   return {
     to_email: citizenEmail,
+    email: citizenEmail,
+    recipient_email: citizenEmail,
+    user_email: citizenEmail,
+    to: citizenEmail,
+    reply_to: citizenEmail,
     to_name: citizenName,
     citizen_name: citizenName,
     complaint_id: complaintId,

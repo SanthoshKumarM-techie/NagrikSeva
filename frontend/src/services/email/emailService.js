@@ -317,13 +317,23 @@ export const sendDepartmentCredentialsEmail = async ({
 
   const templateParams = {
     to_email: toEmail,
+    email: toEmail,
+    recipient_email: toEmail,
+    user_email: toEmail,
+    to: toEmail,
+    reply_to: toEmail,
     to_name: fullName || 'Department Officer',
+    citizen_name: fullName || 'Department Officer',
     officer_name: fullName || 'Department Officer',
     user_code: userCode,
     temporary_password: temporaryPassword,
     department_name: departmentName,
     department_code: departmentCode,
     login_url: targetUrl,
+    tracker_url: targetUrl,
+    status: 'Account Provisioned',
+    complaint_id: userCode || 'DEPT-CRED',
+    updated_at: new Date().toLocaleString(),
     subject: `🏛️ [NagrikSeva] Official Credentials for ${departmentName} (${userCode})`,
     message: `Your nodal officer account for ${departmentName} (${departmentCode}) has been created.\nOfficial ID: ${userCode}\nEmail: ${toEmail}\nInitial Password: ${temporaryPassword}\nLogin Portal: ${targetUrl}`
   };
@@ -385,8 +395,14 @@ export const sendPasswordResetOtpEmail = async ({
 
   const templateParams = {
     to_email: toEmail,
-    to_name: fullName || 'User',
+    email: toEmail,
     recipient_email: toEmail,
+    user_email: toEmail,
+    to: toEmail,
+    reply_to: toEmail,
+    to_name: fullName || 'User',
+    recipient_name: fullName || 'User',
+    citizen_name: fullName || 'User',
     otp_code: otpCode,
     otp: otpCode,
     passcode: otpCode,

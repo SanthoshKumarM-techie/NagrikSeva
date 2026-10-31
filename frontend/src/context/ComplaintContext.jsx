@@ -1368,16 +1368,20 @@ export const ComplaintProvider = ({ children }) => {
         name: dept.name,
         code: dept.code || dept.name.slice(0, 4).toUpperCase(),
         description: dept.description,
+        email: dept.email || dept.contactEmail,
         contactEmail: dept.email || dept.contactEmail,
+        phone: dept.phone || dept.contactPhone,
         contactPhone: dept.phone || dept.contactPhone,
         headOfficer: dept.headOfficer,
         initialPassword: dept.initialPassword,
         address: dept.address
       });
       if (created) {
+        const deptData = created.department || created;
+        const officerAccount = deptData.officerAccount || created.officerAccount;
         const newDept = {
           ...dept,
-          id: created.id,
+          id: deptData.id,
           code: created.code,
           name: created.name,
           description: created.description,
@@ -1405,15 +1409,15 @@ export const ComplaintProvider = ({ children }) => {
             email: created.officerAccount.email,
             phone: created.officerAccount.phone,
             role: 'Department Officer',
-            department: created.name,
-            departmentId: created.id,
+            department: deptData.name,
+            departmentId: deptData.id,
             status: 'Active'
           };
           setUsers(prev => [...prev, newOfficerUser]);
         }
         return {
           ...newDept,
-          officerAccount: created.officerAccount
+          officerAccount
         };
       }
     } catch (err) {

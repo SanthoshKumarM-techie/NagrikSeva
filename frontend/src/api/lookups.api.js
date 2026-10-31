@@ -18,17 +18,17 @@ export const lookupsApi = {
 
   createDepartment: async (data) => {
     const response = await axiosInstance.post('/departments', data);
-    return response.data?.department || response.department || response;
+    return response.data?.data?.department || response.data?.department || response.data?.data || response.data;
   },
 
   updateDepartment: async (id, data) => {
     const response = await axiosInstance.put(`/departments/${id}`, data);
-    return response.data?.department || response.department || response;
+    return response.data?.data?.department || response.data?.department || response.data?.data || response.data;
   },
 
   toggleDepartmentStatus: async (id, isActive) => {
     const response = await axiosInstance.patch(`/departments/${id}/status`, { isActive });
-    return response.data?.department || response.department || response;
+    return response.data?.data?.department || response.data?.department || response.data?.data || response.data;
   },
 };
 

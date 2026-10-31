@@ -118,23 +118,27 @@ export const Departments = () => {
           code: cleanCode
         });
         setModalOpen(false);
-        if (res?.officerAccount) {
+        const officer = res?.officerAccount || res?.data?.officerAccount || res?.department?.officerAccount;
+        if (officer) {
           setCreatedOfficer({
-            ...res.officerAccount,
+            ...officer,
             departmentName: formData.name,
             departmentCode: cleanCode
           });
           setCredentialsModalOpen(true);
 
-          // Dispatch official credentials via EmailJS
-          sendDepartmentCredentialsEmail({
-            toEmail: res.officerAccount.email,
-            fullName: res.officerAccount.fullName,
-            userCode: res.officerAccount.userCode,
-            temporaryPassword: res.officerAccount.temporaryPassword,
-            departmentName: formData.name,
-            departmentCode: cleanCode
-          }).catch(err => console.warn('[EmailJS] Department credentials dispatch note:', err));
+          // Dispatch official credentials to the given email
+          const targetEmail = officer.email || formData.email;
+          if (targetEmail) {
+            sendDepartmentCredentialsEmail({
+              toEmail: targetEmail,
+              fullName: officer.fullName || formData.headOfficer,
+              userCode: officer.userCode,
+              temporaryPassword: officer.temporaryPassword || formData.initialPassword,
+              departmentName: formData.name,
+              departmentCode: cleanCode
+            }).catch(err => console.warn('[EmailJS] Department credentials dispatch note:', err));
+          }
         } else {
           setSuccessToast(`Department "${formData.name}" registered successfully.`);
           setTimeout(() => setSuccessToast(''), 4000);

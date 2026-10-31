@@ -30,12 +30,12 @@ export const authApi = {
 
   requestPasswordResetOtp: async (identifier) => {
     const response = await axiosInstance.post('/auth/forgot-password/request-otp', { identifier });
-    return response.data;
+    return response.data?.data || response.data;
   },
 
   resetPasswordWithOtp: async ({ identifier, otp, newPassword }) => {
     const response = await axiosInstance.post('/auth/forgot-password/reset', { identifier, otp, newPassword });
-    return response.data;
+    return response.data?.data || response.data;
   },
 };
 

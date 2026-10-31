@@ -1,9 +1,20 @@
 import nodemailer from 'nodemailer';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config();
 
 let transporter = null;
 
 function getTransporter() {
   if (!transporter) {
+    if (!process.env.SMTP_USER) {
+      dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+    }
     transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
       port: parseInt(process.env.SMTP_PORT || '587', 10),
@@ -184,7 +195,7 @@ export async function sendDepartmentOfficerWelcomeEmail({
   temporaryPassword,
   departmentName,
   departmentCode,
-  loginUrl = 'http://localhost:5174/login?portal=officer'
+  loginUrl = (process.env.CLIENT_URL || process.env.CORS_ORIGIN || 'http://localhost:5173') + '/login?portal=officer'
 }) {
   if (!toEmail || !toEmail.includes('@')) {
     console.warn(`[MailService] No valid recipient email provided: ${toEmail}`);

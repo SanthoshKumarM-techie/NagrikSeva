@@ -266,18 +266,21 @@ export const Login = () => {
       const res = await requestPasswordResetOtp(forgotId.trim());
       setLoading(false);
       if (res.success) {
-        setForgotMaskedEmail(res.data?.maskedEmail || 'your email');
+        const payload = res.data?.data || res.data;
+        const targetEmail = payload?.email || (forgotId.includes('@') ? forgotId.trim() : null);
+        const masked = payload?.maskedEmail || (targetEmail ? `${targetEmail.slice(0, 3)}***@${targetEmail.split('@')[1]}` : 'your email');
+        setForgotMaskedEmail(masked);
         setForgotStep('reset');
         setResendCooldown(60);
-        setSuccessMsg(res.data?.message || 'Verification OTP dispatched to your email.');
+        setSuccessMsg(payload?.message || res.data?.message || 'Verification OTP dispatched to your email.');
 
-        if (res.data?.email && res.data?.otpCode) {
+        if (targetEmail && payload?.otpCode) {
           sendPasswordResetOtpEmail({
-            toEmail: res.data.email,
-            fullName: res.data.fullName,
-            otpCode: res.data.otpCode,
-            role: res.data.role,
-            userCode: res.data.userCode
+            toEmail: targetEmail,
+            fullName: payload?.fullName || 'NagrikSeva User',
+            otpCode: payload?.otpCode,
+            role: payload?.role || 'CITIZEN',
+            userCode: payload?.userCode || forgotId.trim()
           }).catch(err => console.warn('[EmailJS] OTP email dispatch note:', err));
         }
       } else {

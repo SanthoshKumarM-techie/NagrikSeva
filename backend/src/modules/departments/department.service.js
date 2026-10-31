@@ -126,7 +126,7 @@ export const createDepartment = async (data, adminId, clientInfo = {}) => {
         temporaryPassword: initialPassword,
         departmentName: cleanName,
         departmentCode: cleanCode,
-        loginUrl: 'http://localhost:5174/login?portal=officer'
+        loginUrl: `${process.env.CLIENT_URL || process.env.CORS_ORIGIN || 'http://localhost:5173'}/login?portal=officer`
       });
     } catch (mailErr) {
       console.warn('Mail dispatch note for new department officer:', mailErr.message);
