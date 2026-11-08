@@ -661,17 +661,7 @@ export const Login = () => {
                   required
                 />
 
-                <div className="flex items-center justify-between text-xs -mt-1 mb-1">
-                  <label className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={showPassword}
-                      onChange={(e) => setShowPassword(e.target.checked)}
-                      className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
-                    />
-                    <span>Show password</span>
-                  </label>
-
+                <div className="flex items-center justify-end text-xs -mt-1 mb-1">
                   <button
                     type="button"
                     onClick={() => {
@@ -785,17 +775,7 @@ export const Login = () => {
                   required
                 />
 
-                <div className="flex items-center justify-between text-xs -mt-1 mb-1">
-                  <label className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-400 cursor-pointer select-none hover:text-slate-800 dark:hover:text-slate-200 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={showRegPassword}
-                      onChange={(e) => setShowRegPassword(e.target.checked)}
-                      className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 cursor-pointer"
-                    />
-                    <span>Show password</span>
-                  </label>
-                </div>
+                
 
                 {regRole === 'CITIZEN' ? (
                   <Input
