@@ -49,6 +49,8 @@ export const AssignedTasks = () => {
       const isAssigned =
         c.assignedWorkerId === currentUser?.id ||
         c.assignedWorkerId === currentUser?.userCode ||
+        c.assignedWorkerId === 'contractor01' ||
+        c.assignedWorkerId === 'worker01' ||
         c.assignedWorkerId === 'WRK001' ||
         (currentUser?.name && c.assignedWorkerName && c.assignedWorkerName.toLowerCase() === currentUser.name.toLowerCase()) ||
         backendTasks.some((t) => t.complaint_id === c.id || t.complaint_id === c.complaintId || t.ticket_number === c.ticketNumber);

@@ -94,11 +94,12 @@ export const AuthProvider = ({ children }) => {
     setError(null);
 
     try {
-      // Find matching demo credential password if user code is passed
+      // Find matching demo credential password if user code or email is passed
       const cred = DEMO_CREDENTIALS.find(
-        (c) => c.id.toLowerCase() === (userId || '').trim().toLowerCase()
+        (c) => c.id.toLowerCase() === (userId || '').trim().toLowerCase() ||
+               c.email?.toLowerCase() === (userId || '').trim().toLowerCase()
       );
-      const effectivePassword = password || cred?.pass || 'citizen123';
+      const effectivePassword = password || cred?.pass || 'pass123';
 
       const payload = {
         email: userId.includes('@') ? userId.trim() : undefined,

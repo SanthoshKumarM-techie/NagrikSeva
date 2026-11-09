@@ -502,14 +502,14 @@ export const Login = () => {
                 {forgotStep === 'request' ? (
                   <form onSubmit={handleRequestOtp} className="space-y-4">
                     <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                      Enter your registered <strong>Email Address</strong> or official <strong>User ID</strong> (e.g. <code>OFF001</code>, <code>WRK001</code>, <code>CIT001</code>). Department officers, field staff, and citizens can reset their password independently.
+                      Enter your registered <strong>Email Address</strong> or official <strong>User ID</strong> (e.g. <code>officer01</code>, <code>contractor01</code>, <code>citizen01</code>, <code>admin01</code>). Department officers, field staff, and citizens can reset their password independently.
                     </p>
 
                     <Input
                       label="Email or Official ID"
                       id="forgotId"
                       icon={User}
-                      placeholder="e.g. name@bbmp.gov.in or OFF001"
+                      placeholder="e.g. officer01@bbmp.gov.in or officer01"
                       value={forgotId}
                       onChange={(e) => setForgotId(e.target.value)}
                       required
